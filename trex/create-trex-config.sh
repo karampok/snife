@@ -26,18 +26,14 @@ SOCKET=0 #TODO
 lscpu|grep node1 | awk '{print $NF}' | awk '/-/{for (i=$1; i<=$2; i++)printf "%s%s",i,ORS;next} 1' RS=, FS=- |grep ^"MASTER"$ && SOCKET=1
 
 PCIS=$(env |grep PCIDEVICE_OPENSHIFT_IO)
-INTS="${PCIS##*=}"
 i=0
 INTERFACES=()
 for P in ${PCIS}
 do
-    INTS="${PCIS##*=}"
-    INTERFACES[$i]=$(echo "$INTS" | sed 's/[^,]*/"&"/g')
+    INTERFACES[$i]='"'$(echo $P | cut -d '=' -f 2)'"'
     i=$((i+1))
 done
-
 INTERFACES_ARRAY=$(echo [${INTERFACES[*]}] | sed 's/ /,/g')
-
 
 cat << EOF
 - port_limit: 2
