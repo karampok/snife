@@ -8,7 +8,6 @@ MASTER="${arr[0]}" && unset 'arr[0]'
 SIBLING=$(cat /sys/devices/system/cpu/cpu"$MASTER"/topology/core_cpus_list)
 SIBLING="1,53"
 LATENCY="${SIBLING##*,}"
-cpus=${arr[@]/$LATENCY}
 CPUS=""
 for i in "${arr[@]}"
 do
@@ -47,7 +46,3 @@ cat << EOF
      - socket: ${SOCKET}
        threads: [${CPUS%,}]
 EOF
-exit 
-
-export NUMBER_THREADS="${#CPUS[@]}"
-

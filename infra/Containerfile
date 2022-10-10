@@ -1,0 +1,36 @@
+FROM alpine:3.11 AS build
+
+ARG CHANNEL=stable
+ARG VERSION=1.30.2
+ARG ARCH=amd64
+
+RUN mkdir /build
+WORKDIR /build
+RUN apk add --no-cache curl tar
+
+RUN curl -vsLo tailscale.tar.gz "https://pkgs.tailscale.com/${CHANNEL}/tailscale_${VERSION}_${ARCH}.tgz" && \
+  tar xvf tailscale.tar.gz && \
+  mv "tailscale_${VERSION}_${ARCH}/tailscaled" . && \
+  mv "tailscale_${VERSION}_${ARCH}/tailscale" .
+
+FROM fedora:36 as runtime
+LABEL description="Run container"
+
+RUN dnf install -y numactl strace ipcalc iptables file bind-utils tcpdump nmap-ncat iputils iproute \ 
+  dnf-plugin-config-manager tmux dhcp-client openssh-clients wget nmstate procps-ng hwloc-gui hwloc \ 
+  git stress bridge-utils conntrack-tools vim htop jq && dnf clean all
+
+RUN setcap 'cap_net_raw+ep' /usr/sbin/tcpdump
+
+RUN cd /tmp \ 
+  && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.11/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && tar xvfz openshift-client-linux.tar.gz \
+  && mv oc kubectl /usr/bin/ && chmod +x /usr/bin/{oc,kubectl} && rm -f README.md openshift-client-linux.tar.gz
+
+COPY --from=build /build/tailscale /usr/bin/
+COPY --from=build /build/tailscaled /usr/bin/
+RUN printf 'tailscale up --ssh -auth-key=$TS_AUTH --hostname infra --advertise-routes "10.10.10.0/24"\n' >> /etc/motd
+
+USER root
+CMD ["tailscaled"]
+#https://tailscale.com/kb/1111/ephemeral-nodes/
+#ahttps://gist.github.com/hamishforbes/2ac7ae9d7ea47cad4e3a813c9b45c10f
