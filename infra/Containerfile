@@ -17,10 +17,11 @@ FROM fedora:36 as runtime
 LABEL description="Run container"
 
 RUN dnf install -y numactl strace ipcalc iptables file bind-utils tcpdump nmap-ncat iputils iproute \ 
-  dnf-plugin-config-manager tmux dhcp-client openssh-clients wget nmstate procps-ng hwloc-gui hwloc \ 
+  pip openssl coreos-installer dnf-plugin-config-manager tmux dhcp-client openssh-clients wget nmstate procps-ng hwloc-gui hwloc \ 
   git stress bridge-utils conntrack-tools vim htop jq && dnf clean all
 
 RUN setcap 'cap_net_raw+ep' /usr/sbin/tcpdump
+RUN pip3 install aicli
 
 RUN cd /tmp \ 
   && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.11/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && tar xvfz openshift-client-linux.tar.gz \
