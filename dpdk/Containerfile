@@ -1,33 +1,48 @@
-FROM quay.io/centos/centos:stream8
+#FROM quay.io/centos/centos:stream8 AS CP
+#RUN dnf install -y tmux
+#COPY --from=CP /usr/bin/tmux /usr/bin/
 
-# https://github.com/redhat-nfvpe/container-perf-tools/tree/master/standalone-testpmd
-# https://github.com/SchSeba/dpdk-testpm-trex-example/blob/main/Dockerfile-dpdk
+FROM registry.redhat.io/openshift4/dpdk-base-rhel8:v4.11.3-8.1669833139
+#https://catalog.redhat.com/software/containers/openshift4/dpdk-base-rhel8/5e32be6cdd19c77896004a41?container-tabs=overview
 
-ARG DPDK_VERSION=22.07.0
-ENV DPDK_VERSION ${DPDK_VERSION}
+#RUN sudo dnf install -y tmux
+# python3 \
+#   numactl numactl-devel jq make logrotate ethtool patch which readline-devel iproute libibverbs lua git gcc \
+#   expect sysstat pciutils perf htop tmux net-tools libibverbs-devel perf tcpdump && dnf clean all
 
-RUN dnf install dnf-plugins-core -y  && \
-  dnf config-manager --set-enabled powertools && \
-  dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-
-RUN dnf install -y wget python3 \
-  numactl numactl-devel jq make logrotate ethtool patch which readline-devel iproute libibverbs lua git gcc \
-  expect sysstat pciutils perf htop tmux net-tools libibverbs-devel perf tcpdump && dnf clean all
-
-RUN pip3 install meson ninja pyelftools
-
-RUN cd /usr/src/ && \
-  wget http://fast.dpdk.org/rel/dpdk-${DPDK_VERSION}.tar.xz && \ 
-  tar -xpvf dpdk-${DPDK_VERSION}.tar.xz && rm dpdk-${DPDK_VERSION}.tar.xz && \
-  cd dpdk-stable-${DPDK_VERSION} && \
-  meson build && \
-  cd build  && \
-  meson configure -Denable_docs=false -Dbuildtype=debug && \
-  ninja && \
-  ninja install && \
-  echo "/usr/local/lib64" > /etc/ld.so.conf.d/dpdk.conf && \
-  ldconfig
 
 COPY start-testpmd.sh /usr/local/bin/
+COPY jq /usr/local/bin/
 
-WORKDIR /usr/src/dpdk-stable-${DPDK_VER}
+
+# # https://github.com/redhat-nfvpe/container-perf-tools/tree/master/standalone-testpmd
+# # https://github.com/SchSeba/dpdk-testpm-trex-example/blob/main/Dockerfile-dpdk
+
+# ARG DPDK_VERSION=22.07.0
+# ENV DPDK_VERSION ${DPDK_VERSION}
+
+# RUN dnf install dnf-plugins-core -y  && \
+#   dnf config-manager --set-enabled powertools && \
+#   dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+
+# RUN dnf install -y wget python3 \
+#   numactl numactl-devel jq make logrotate ethtool patch which readline-devel iproute libibverbs lua git gcc \
+#   expect sysstat pciutils perf htop tmux net-tools libibverbs-devel perf tcpdump && dnf clean all
+
+# RUN pip3 install meson ninja pyelftools
+
+# RUN cd /usr/src/ && \
+#   wget http://fast.dpdk.org/rel/dpdk-${DPDK_VERSION}.tar.xz && \ 
+#   tar -xpvf dpdk-${DPDK_VERSION}.tar.xz && rm dpdk-${DPDK_VERSION}.tar.xz && \
+#   cd dpdk-stable-${DPDK_VERSION} && \
+#   meson build && \
+#   cd build  && \
+#   meson configure -Denable_docs=false -Dbuildtype=debug && \
+#   ninja && \
+#   ninja install && \
+#   echo "/usr/local/lib64" > /etc/ld.so.conf.d/dpdk.conf && \
+#   ldconfig
+
+# COPY start-testpmd.sh /usr/local/bin/
+
+# WORKDIR /usr/src/dpdk-stable-${DPDK_VER}

@@ -29,6 +29,7 @@ for i in "${ACPUS[@]}"; do
 done
 CPUS="${CPUS:1}"
 
+
 X=$(grep k8s.v1.cni.cncf.io/network-status /etc/podnetinfo/annotations| awk -F= '{print $2}')
 X=$(echo -e "$X")
 X="${X//\\/}"
@@ -38,6 +39,9 @@ NETINFO=$X
 LEFT=$(echo "$NETINFO" | jq -r '.[] | select(.interface=="net1")."device-info".pci."pci-address"')
 RIGHT=$(echo "$NETINFO" | jq -r '.[] | select(.interface=="net2")."device-info".pci."pci-address"')
 
-echo dpdk-testpmd -l "$MASTER,$CPUS" -a "$LEFT" -a "$RIGHT" \
-  -- --nb-cores="$NUM" --forward-mode=mac --rxd=2048 --txd=2048 -i \
-  --eth-peer=0,"$LEFT_MAC" --eth-peer=1,"$RIGHT_MAC"
+NBCORES=${NBCORES:-$NUM}
+: "${CHANNELS:-4}"
+
+dpdk-testpmd -l "$MASTER,$CPUS" -a "$LEFT" -a "$RIGHT" -n "$CHANNELS" \
+  -- --nb-cores="$NUM" --forward-mode=mac --rxd=2048 --txd=2048  \
+  --eth-peer=0,"$LEFT_MAC" --eth-peer=1,"$RIGHT_MAC" --auto-start --stats-period 10

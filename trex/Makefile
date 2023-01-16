@@ -1,5 +1,5 @@
 NAME = quay.io/karampok/trex
-VERSION = 2.87
+VERSION = 3.00
 
 build: 
 	podman build --rm  --build-arg TREX_VERSION=$(VERSION)  -t $(NAME):$(VERSION) .

@@ -13,15 +13,15 @@ RUN curl -vsLo tailscale.tar.gz "https://pkgs.tailscale.com/${CHANNEL}/tailscale
   mv "tailscale_${VERSION}_${ARCH}/tailscaled" . && \
   mv "tailscale_${VERSION}_${ARCH}/tailscale" .
 
-FROM fedora:36 as runtime
+FROM fedora:37 as runtime
 LABEL description="Run container"
 
 RUN dnf install -y numactl strace ipcalc iptables file bind-utils tcpdump nmap-ncat iputils iproute \ 
   pip openssl coreos-installer dnf-plugin-config-manager tmux dhcp-client openssh-clients wget nmstate procps-ng hwloc-gui hwloc \ 
-  git stress bridge-utils conntrack-tools vim htop jq && dnf clean all
+  libvirt-devel gcc python3-devel git mosh stress bridge-utils conntrack-tools vim htop jq xz && dnf clean all
 
 RUN setcap 'cap_net_raw+ep' /usr/sbin/tcpdump
-RUN pip3 install aicli
+RUN pip3 install kcli aicli
 
 RUN cd /tmp \ 
   && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.11/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && tar xvfz openshift-client-linux.tar.gz \
@@ -29,7 +29,9 @@ RUN cd /tmp \
 
 COPY --from=build /build/tailscale /usr/bin/
 COPY --from=build /build/tailscaled /usr/bin/
+COPY mutagen-agent /usr/bin/
 RUN printf 'tailscale up --ssh -auth-key=$TS_AUTH --hostname infra --advertise-routes "10.10.10.0/24"\n' >> /etc/motd
+RUN printf 'mutagen-agent install\n' >> /etc/motd
 
 USER root
 CMD ["tailscaled"]
