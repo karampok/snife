@@ -1,6 +1,7 @@
 #! /bin/bash
 set -euo pipefail
 
+# podman run --privileged --env-file=/home/core/envs -v /tmp:/tmp -v /:/host  --user=root --net=host --pid=host -it --rm quay.io/karampok/snife:latest dpdk-prof.sh
 #LEFTMAC="{LEFTMAC-:-'12:20:04:2e:6d:20'}"
 #RIGHTMAC="{RIGHTMAC-:-'12:20:04:2e:6d:21'}"
 PROCESS=${PROCESS:-"dpdk-testpmd"}
@@ -23,23 +24,24 @@ PROCESS=${PROCESS:-"dpdk-testpmd"}
 
 
 TS=$(date +"%s")
-folder=prof-"$TS"
+folder=/tmp/prof-"$TS"
 
-mkdir -p /tmp/"$folder" && cd /tmp/"$folder"
+mkdir -p "$folder" && cd "$folder"
 cp "$0" . || true
 
-f=$(grep cpuset /proc/"$(pidof "$PROCESS")"/cgroup|awk -F: '{print "/sys/fs/cgroup/cpuset"$3"/cpuset.cpus"}')
+f=$(grep cpuset /proc/"$(pidof "$PROCESS")"/cgroup|awk -F: '{print "/host/sys/fs/cgroup/cpuset"$3"/cpuset.cpus"}')
 cpus=$(cat "$f")
 echo "$cpus" > cpuset
 
+CPU_ARRAY=$(echo "${cpus}" | awk '/-/{for (i=$1; i<=$2; i++)printf "%s%s",i,ORS;next} 1' RS=, FS=-) #1 2 3 4 53 54 55 56
+# shellcheck disable=2086,2116
+array=$(echo ${CPU_ARRAY})
 
-#CPU_ARRAY=$(echo "${cpus}" | awk '/-/{for (i=$1; i<=$2; i++)printf "%s%s",i,ORS;next} 1' RS=, FS=-) #1 2 3 4 53 54 55 56
-#array=$(echo ${CPU_ARRAY})
-
+cat /host/proc/interrupts &>"$folder"/interrupts-A
 ip -s -s --json link|jq '.[] | select(.ifname | startswith("ens"))' | jq -s '.' > ip_link_show_A.json
-sleep 10 #perf record -z -C $cpus sleep 10
+perf record -z -C "$cpus" sleep 10
 ip -s -s --json link|jq '.[] | select(.ifname | startswith("ens"))' | jq -s '.' > ip_link_show_B.json
-
+cat /host/proc/interrupts &>"$folder"/interrupts-B
 
 cat <<EOT > run-stats.sh
 #! /bin/bash
@@ -47,31 +49,42 @@ set -euo pipefail
 
 # $cpus
 
+perf report --stdio --sort=comm,dso > perf_report_stdio_sort_commdso.txt
+perf report --stdio > perf_report_stdio.txt
+for c in $array;do
+  perf report -C \$c --stdio > perf_report_stdio_cpu\$c.txt
+done
+
 # $PROCESS port 0 /left
-jq '.[].vfinfo_list[] | select(.address=="$LEFTMAC").stats.rx' ip_link_show_A.json >  leftmac-rx-A.json
-jq '.[].vfinfo_list[] | select(.address=="$LEFTMAC").stats.rx' ip_link_show_B.json >  leftmac-rx-B.json
-jq '.[].vfinfo_list[] | select(.address=="$LEFTMAC").stats.tx' ip_link_show_A.json >  leftmac-tx-A.json
-jq '.[].vfinfo_list[] | select(.address=="$LEFTMAC").stats.tx' ip_link_show_B.json >  leftmac-tx-B.json
+jq '.[].vfinfo_list[] | select(.address=="$LEFTMAC").stats.rx' ip_link_show_A.json > leftmac-rx-A.json
+jq '.[].vfinfo_list[] | select(.address=="$LEFTMAC").stats.rx' ip_link_show_B.json > leftmac-rx-B.json
+jq '.[].vfinfo_list[] | select(.address=="$LEFTMAC").stats.tx' ip_link_show_A.json > leftmac-tx-A.json
+jq '.[].vfinfo_list[] | select(.address=="$LEFTMAC").stats.tx' ip_link_show_B.json > leftmac-tx-B.json
 
 # $PROCESS port 0 /right
-jq '.[].vfinfo_list[] | select(.address=="$RIGHTMAC").stats.rx' ip_link_show_A.json >  rightmac-rx-A.json
-jq '.[].vfinfo_list[] | select(.address=="$RIGHTMAC").stats.rx' ip_link_show_B.json >  rightmac-rx-B.json
-jq '.[].vfinfo_list[] | select(.address=="$RIGHTMAC").stats.tx' ip_link_show_A.json >  rightmac-tx-A.json
-jq '.[].vfinfo_list[] | select(.address=="$RIGHTMAC").stats.tx' ip_link_show_B.json >  rightmac-tx-B.json
+jq '.[].vfinfo_list[] | select(.address=="$RIGHTMAC").stats.rx' ip_link_show_A.json > rightmac-rx-A.json
+jq '.[].vfinfo_list[] | select(.address=="$RIGHTMAC").stats.rx' ip_link_show_B.json > rightmac-rx-B.json
+jq '.[].vfinfo_list[] | select(.address=="$RIGHTMAC").stats.tx' ip_link_show_A.json > rightmac-tx-A.json
+jq '.[].vfinfo_list[] | select(.address=="$RIGHTMAC").stats.tx' ip_link_show_B.json > rightmac-tx-B.json
 
 echo "$folder"
 echo "$PROCESS pod"
-paste leftmac-rx-A.json leftmac-rx-B.json | awk    '/"packets"/{printf "left-RX-pps %1.6e\n", (\$4-\$2)/10}'
+paste leftmac-rx-A.json leftmac-rx-B.json | awk '/"packets"/{printf "left-RX-pps %1.6e\n", (\$4-\$2)/10}'
 paste rightmac-tx-A.json rightmac-tx-B.json | awk '/"tx_packets"/{printf "right-TX-pps %1.6e\n", (\$4-\$2)/10}'
 
-paste rightmac-rx-A.json rightmac-rx-B.json | awk    '/"packets"/{printf "right-RX-pps %1.6e\n", (\$4-\$2)/10}'
-paste leftmac-tx-A.json lefttmac-tx-B.json | awk '/"tx_packets"/{printf "left-TX-pps %1.6e\n", (\$4-\$2)/10}'
+paste rightmac-rx-A.json rightmac-rx-B.json | awk '/"packets"/{printf "right-RX-pps %1.6e\n", (\$4-\$2)/10}'
+paste leftmac-tx-A.json leftmac-tx-B.json | awk '/"tx_packets"/{printf "left-TX-pps %1.6e\n", (\$4-\$2)/10}'
 
 rm {left,right}mac*.json
 EOT
 
+ps -ae -o pid= | xargs -n 1 taskset -cp &>"$folder"/ps-ae-opid-tasket-cp.txt || true
+ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm,cls >"$folder"/ps-eo-pid-tid-class.output
+sysctl -A >"$folder"/sysctl-A
+cat /host/proc/iomem &>"$folder"/iomem
+cat /host/proc/sched_debug &>"$folder"/sched_debug
 for c in pcm pcm-memory pcm-numa; do
-  podman run --privileged --pid=host -it --rm quay.io/fbaudin/testpmd $c 5 -i=2 > "$c"_5_i2.output
+  $c 5 -i=2 >"$folder"/"$c"_5_i2.output 2>&1
 done
 
 chmod +x run-stats.sh

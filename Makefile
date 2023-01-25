@@ -4,7 +4,7 @@ VERSION = latest
 build: 
 	podman build --rm  -t $(NAME):$(VERSION) .
 
-push: 
+push: build
 	podman push $(NAME):$(VERSION)
 
 run:
