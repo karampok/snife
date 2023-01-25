@@ -64,11 +64,15 @@ echo "$PROCESS pod"
 paste leftmac-rx-A.json leftmac-rx-B.json | awk    '/"packets"/{printf "left-RX-pps %1.6e\n", (\$4-\$2)/10}'
 paste rightmac-tx-A.json rightmac-tx-B.json | awk '/"tx_packets"/{printf "right-TX-pps %1.6e\n", (\$4-\$2)/10}'
 
-paste leftmac-rx-A.json leftmac-rx-B.json | awk    '/"packets"/{printf "left-RX-pps %1.6e\n", (\$4-\$2)/10}'
-paste rightmac-tx-A.json rightmac-tx-B.json | awk '/"tx_packets"/{printf "right-TX-pps %1.6e\n", (\$4-\$2)/10}'
+paste rightmac-rx-A.json rightmac-rx-B.json | awk    '/"packets"/{printf "right-RX-pps %1.6e\n", (\$4-\$2)/10}'
+paste leftmac-tx-A.json lefttmac-tx-B.json | awk '/"tx_packets"/{printf "left-TX-pps %1.6e\n", (\$4-\$2)/10}'
 
 rm {left,right}mac*.json
 EOT
+
+for c in pcm pcm-memory pcm-numa; do
+  podman run --privileged --pid=host -it --rm quay.io/fbaudin/testpmd $c 5 -i=2 > "$c"_5_i2.output
+done
 
 chmod +x run-stats.sh
 ./run-stats.sh | tee results
