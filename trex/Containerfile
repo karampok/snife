@@ -17,6 +17,7 @@ RUN wget --no-check-certificate https://trex-tgn.cisco.com/trex/release/v${TREX_
   cp /opt/trex/cfg/simple_cfg.yaml /etc/trex_cfg.yaml
 
 COPY start-trex.sh /usr/local/bin/
+RUN printf '/trex-console; # tui start -f /opt/tests/testpmd.py -m 1mpps -p 0\n' >> /etc/motd
 
 WORKDIR /opt/trex
 

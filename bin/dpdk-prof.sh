@@ -49,10 +49,10 @@ set -euo pipefail
 
 # $cpus
 
-perf report --stdio --sort=comm,dso > perf_report_stdio_sort_commdso.txt
-perf report --stdio > perf_report_stdio.txt
+perf report --stdio --sort=comm,dso > perf_report_stdio_sort_commdso.output
+perf report --stdio > perf_report_stdio.output
 for c in $array;do
-  perf report -C \$c --stdio > perf_report_stdio_cpu\$c.txt
+  perf report -C \$c --stdio > perf_report_stdio_cpu\$c.output
 done
 
 # $PROCESS port 0 /left
@@ -78,7 +78,7 @@ paste leftmac-tx-A.json leftmac-tx-B.json | awk '/"tx_packets"/{printf "left-TX-
 rm {left,right}mac*.json
 EOT
 
-ps -ae -o pid= | xargs -n 1 taskset -cp &>"$folder"/ps-ae-opid-tasket-cp.txt || true
+ps -ae -o pid= | xargs -n 1 taskset -cp &>"$folder"/ps-ae-opid-tasket-cp.output || true
 ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm,cls >"$folder"/ps-eo-pid-tid-class.output
 sysctl -A >"$folder"/sysctl-A
 cat /host/proc/iomem &>"$folder"/iomem
