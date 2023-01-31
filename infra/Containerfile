@@ -21,7 +21,7 @@ RUN dnf install -y numactl strace ipcalc iptables file bind-utils tcpdump nmap-n
   libvirt-devel gcc python3-devel git mosh stress bridge-utils conntrack-tools vim htop jq xz && dnf clean all
 
 RUN setcap 'cap_net_raw+ep' /usr/sbin/tcpdump
-RUN pip3 install kcli aicli
+RUN curl https://raw.githubusercontent.com/karmab/kcli/main/install.sh | sudo bash
 
 RUN cd /tmp \ 
   && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.11/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && tar xvfz openshift-client-linux.tar.gz \
