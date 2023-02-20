@@ -30,8 +30,6 @@ folder=/tmp/prof-"$TS"
 mkdir -p "$folder" && cd "$folder"
 cp "$0" . || true
 
-# TODO// dmesg -c and at end dmesg
-
 # TODO// run inside or outside container
 f=$(grep cpuset /proc/"$(pidof "$PROCESS")"/cgroup|awk -F: '{print "/host/sys/fs/cgroup/cpuset"$3"/cpuset.cpus"}')
 cpus=$(cat "$f")
@@ -41,11 +39,15 @@ CPU_ARRAY=$(echo "${cpus}" | awk '/-/{for (i=$1; i<=$2; i++)printf "%s%s",i,ORS;
 # shellcheck disable=2086,2116
 array=$(echo ${CPU_ARRAY})
 
+dmesg &>"$folder"/dmesg-A
+ip --json link| jq -r '.[] | select(.ifname | startswith("ens")).ifname' | xargs -i sh -c 'ethtool -S &>"$folder"/ethtool-s-{}-A'
 cat /host/proc/interrupts &>"$folder"/interrupts-A
 ip -s -s --json link|jq '.[] | select(.ifname | startswith("ens"))' | jq -s '.' > ip_link_show_A.json
 perf record -z -C "$cpus" sleep 10
 ip -s -s --json link|jq '.[] | select(.ifname | startswith("ens"))' | jq -s '.' > ip_link_show_B.json
 cat /host/proc/interrupts &>"$folder"/interrupts-B
+ip --json link| jq -r '.[] | select(.ifname | startswith("ens")).ifname' | xargs -i sh -c 'ethtool -S &>"$folder"/ethtool-s-{}-B'
+dmesg &>"$folder"/dmesg-B
 
 ps -ae -o pid= | xargs -n 1 taskset -cp &>"$folder"/ps-ae-opid-tasket-cp.output || true
 ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm,cls >"$folder"/ps-eo-pid-tid-class.output
@@ -99,3 +101,5 @@ chmod +x run-stats.sh
 # shellcheck disable=2002
 cat results | tr '\n' ',' |  tr ' ' ',' >> /tmp/results.csv
 echo "" >> /tmp/results.csv
+
+tar -czvf "${folder##*/}"-tar.gz -C "$folder" .
