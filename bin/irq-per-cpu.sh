@@ -1,6 +1,6 @@
 #!/bin/bash
 
-FILE=/proc/interrupts
+FILE=${FILE:-"/proc/interrupts"}
 interrupts_per_cpu(){
   CPU_ID=$1
   output=$(awk 'NR==1 {
@@ -44,9 +44,9 @@ interrupts_per_cpu(){
       exit 1
     }
   }
-  ' ${FILE})
+  ' "$2")
 
   echo "${output}"
 }
 
-interrupts_per_cpu $1
+interrupts_per_cpu "$1" "$2"
