@@ -32,7 +32,8 @@ mkdir -p "$folder" && cd "$folder"
 cp "$0" . || true
 
 # TODO// run inside or outside container
-f=$(grep cpuset /proc/"$(pidof "$PROCESS")"/cgroup|awk -F: '{print "/host/sys/fs/cgroup/cpuset"$3"/cpuset.cpus"}')
+f=$(grep cpuset /proc/"$(pidof -s "$PROCESS")"/cgroup|awk -F: '{print "/host/sys/fs/cgroup/cpuset"$3"/cpuset.cpus"}')
+cpumask=$(grep Cpus_allowed: /proc/"$(pidof -s "$PROCESS")"/status|awk '{print $2}')
 cpus=$(cat "$f")
 echo "$cpus" > cpuset
 
@@ -60,8 +61,9 @@ sysctl -A >"$folder"/sysctl-A
 cat /host/proc/iomem &>"$folder"/iomem
 cat /host/proc/sched_debug &>"$folder"/sched_debug
 
-cpupower monitor -i 10 &>"$folder"/cpu_monitor.txt
-
+cpupower monitor -i 10 &>"$folder"/cpu_monitor.output
+pstree -p $(pidof -s "$PROCESS") &>"$folder"/pstree-p-process.output
+top -b -n 2 -H -p $(pidof -s "$PROCESS") &>"$folder"/top-b-n2-H-p-process.output
 
 cat <<EOT > run-perf.sh
 #! /bin/bash
@@ -88,24 +90,37 @@ echo "for f in bad-prof/perf/*;do nvim -d {good,bad}-prof/perf/${f##*/};read -n 
 EOT
 chmod +x run-perf.sh
 
-cat <<EOT > run-cpu-ftrace.sh
+cat <<EOT > run-ftrace.sh
 #! /bin/bash
 set -xeuo pipefail
 
 # https://www.kernel.org/doc/Documentation/trace/ftrace.txt
-#
-mkdir -p ftrace
-echo function_graph > /host/sys/kernel/debug/tracing/current_tracer
-echo 1 > /host/sys/kernel/debug/tracing/tracing_on && sleep 10 && echo 0 > /host/sys/kernel/debug/tracing/tracing_on
-
 # $cpus
-for c in $array;do
-  cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > ftrace/cpu\$c.txt
-done
-echo nop > /host/sys/kernel/debug/tracing/current_tracer
+echo $cpumask > /host/sys/kernel/debug/tracing/tracing_cpumask
 
+for tracer in function_graph; do
+  mkdir -p ftrace-\$tracer
+  echo \$tracer > /host/sys/kernel/debug/tracing/current_tracer
+  echo 1 > /host/sys/kernel/debug/tracing/tracing_on && sleep 10 && echo 0 > /host/sys/kernel/debug/tracing/tracing_on
+
+  #for c in seq 0 63;do
+  for c in $array;do
+    cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > ftrace-\$tracer/cpu\$c.txt
+  done
+  echo nop > /host/sys/kernel/debug/tracing/current_tracer
+done
+
+mkdir -p ftrace-sched_irq_vectors
+echo sched irq_vectors > /host/sys/kernel/debug/tracing/set_event
+echo 1 > /host/sys/kernel/debug/tracing/tracing_on && sleep 10 && echo 0 > /host/sys/kernel/debug/tracing/tracing_on
+for c in $array;do
+  cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > ftrace-sched_irq_vectors/cpu\$c.txt
+done
+echo > /host/sys/kernel/debug/tracing/set_event
+
+# TODO echo  ffffffff,ffffffff > /host/sys/kernel/debug/tracing/tracing_cpumask
 EOT
-chmod +x run-cpu-ftrace.sh
+chmod +x run-ftrace.sh
 
 
 cat <<EOT > run-stats.sh
@@ -139,6 +154,8 @@ EOT
 chmod +x run-stats.sh
 
 ./run-stats.sh | tee results
+./run-ftrace.sh
+./run-perf.sh
 # shellcheck disable=2002
 #cat results | tr '\n' ',' |  tr ' ' ',' >> /tmp/results.csv
 #echo "" >> /tmp/results.csv
