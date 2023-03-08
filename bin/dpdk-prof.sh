@@ -28,7 +28,7 @@ INTERVAL=${INTERVAL:-"10"}
 TS=$(date +"%s")
 folder=/tmp/prof-"$TS"
 
-mkdir -p "$folder" && cd "$folder"
+mkdir -p "$folder"/ethtool && cd "$folder"
 cp "$0" . || true
 
 # TODO// run inside or outside container
@@ -42,28 +42,30 @@ CPU_ARRAY=$(echo "${cpus}" | awk '/-/{for (i=$1; i<=$2; i++)printf "%s%s",i,ORS;
 array=$(echo ${CPU_ARRAY})
 
 dmesg &>"$folder"/dmesg-A
-cat /host/proc/interrupts &>"$folder"/interrupts-A
+cat /host/proc/interrupts &>"$folder"/proc_interrupts-A
 
 # TODO add ens under ENV
-ip --json link| jq -r '.[] | select(.ifname | startswith("ens")).ifname' | xargs -i sh -c 'ethtool -S {} &>"$folder"/ethtool-s-{}-A'
+# TODO ethtool folder to be given as var
+ip --json link| jq -r '.[] | select(.ifname | startswith("ens")).ifname' | xargs -i sh -c 'ethtool -S {} &> ethtool/s-{}-A'
 echo "TIMESTAMP A - $(date +"%s")"
 ip -s -s --json link|jq '.[] | select(.ifname | startswith("ens"))' | jq -s '.' > ip_link_show_A.json
 sleep "$INTERVAL"
 ip -s -s --json link|jq '.[] | select(.ifname | startswith("ens"))' | jq -s '.' > ip_link_show_B.json
 echo "TIMESTAMP B - $(date +"%s")"
-ip --json link| jq -r '.[] | select(.ifname | startswith("ens")).ifname' | xargs -i sh -c 'ethtool -S {} &>"$folder"/ethtool-s-{}-B'
-cat /host/proc/interrupts &>"$folder"/interrupts-B
+ip --json link| jq -r '.[] | select(.ifname | startswith("ens")).ifname' | xargs -i sh -c 'ethtool -S {} &> ethtool/s-{}-B'
+cat /host/proc/interrupts &>"$folder"/proc_interrupts-B
 dmesg &>"$folder"/dmesg-B
 
 ps -ae -o pid= | xargs -n 1 taskset -cp &>"$folder"/ps-ae-opid-tasket-cp.output || true
 ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm,cls >"$folder"/ps-eo-pid-tid-class.output
 sysctl -A >"$folder"/sysctl-A
-cat /host/proc/iomem &>"$folder"/iomem
-cat /host/proc/sched_debug &>"$folder"/sched_debug
+cat /host/proc/iomem &>"$folder"/proc_iomem
+cat /host/proc/sched_debug &>"$folder"/proc_sched_debug
+cat /host/proc/cmdline &>"$folder"/proc_cmdline
 
 cpupower monitor -i 10 &>"$folder"/cpu_monitor.output
-pstree -p $(pidof -s "$PROCESS") &>"$folder"/pstree-p-process.output
-top -b -n 2 -H -p $(pidof -s "$PROCESS") &>"$folder"/top-b-n2-H-p-process.output
+pstree -p "$(pidof -s "$PROCESS")" &>"$folder"/pstree-p-process.output
+top -b -n 2 -H -p "$(pidof -s "$PROCESS")" &>"$folder"/top-b-n2-H-p-process.output
 
 cat <<EOT > run-perf.sh
 #! /bin/bash
@@ -103,7 +105,6 @@ for tracer in function_graph; do
   echo \$tracer > /host/sys/kernel/debug/tracing/current_tracer
   echo 1 > /host/sys/kernel/debug/tracing/tracing_on && sleep 10 && echo 0 > /host/sys/kernel/debug/tracing/tracing_on
 
-  #for c in seq 0 63;do
   for c in $array;do
     cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > ftrace-\$tracer/cpu\$c.txt
   done
@@ -113,6 +114,7 @@ done
 mkdir -p ftrace-sched_irq_vectors
 echo sched irq_vectors > /host/sys/kernel/debug/tracing/set_event
 echo 1 > /host/sys/kernel/debug/tracing/tracing_on && sleep 10 && echo 0 > /host/sys/kernel/debug/tracing/tracing_on
+#for c in \$(seq 0 63);do
 for c in $array;do
   cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > ftrace-sched_irq_vectors/cpu\$c.txt
 done
@@ -121,6 +123,33 @@ echo > /host/sys/kernel/debug/tracing/set_event
 # TODO echo  ffffffff,ffffffff > /host/sys/kernel/debug/tracing/tracing_cpumask
 EOT
 chmod +x run-ftrace.sh
+
+
+cat <<EOT > run-ftrace-all.sh
+#! /bin/bash
+set -xeuo pipefail
+
+echo ff,ffffffff,ffffffff,ffffffff > /host/sys/kernel/debug/tracing/tracing_cpumask
+
+mkdir -p ftrace-sched_irq_vectors-all
+echo sched irq_vectors > /host/sys/kernel/debug/tracing/set_event
+echo stacktrace        > /host/sys/kernel/debug/tracing/events/sched/sched_switch/trigger
+echo 'stacktrace'      > /host/sys/kernel/debug/tracing/events/sched/sched_wakeup/trigger
+
+echo 1 > /host/sys/kernel/debug/tracing/tracing_on && sleep 10 && echo 0 > /host/sys/kernel/debug/tracing/tracing_on
+
+cat /host/sys/kernel/debug/tracing/trace > ftrace-sched_irq_vectors-all/trace
+
+for c in \$(seq 0 63);do
+  cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > ftrace-sched_irq_vectors-all/cpu\$c.txt
+done
+
+echo > /host/sys/kernel/debug/tracing/set_event
+echo '!stacktrace' > /host/sys/kernel/debug/tracing/events/sched/sched_switch/trigger
+echo '!stacktrace' > /host/sys/kernel/debug/tracing/events/sched/sched_wakeup/trigger
+
+EOT
+chmod +x run-ftrace-all.sh
 
 
 cat <<EOT > run-stats.sh
@@ -165,4 +194,20 @@ echo tar -czvf "${folder##*/}"-tar.gz -C "$folder" .
 # TODO
 # hwlatdetect --threshold 5 --duration 600 --window 1000000 --width 950000
 
+# TODO knit tool
+# cho 0 > /sys/kernel/debug/tracing/tracing_on
+#echo 1 > /sys/kernel/debug/tracing/options/stacktrace
+#echo > /sys/kernel/debug/tracing/trace
+#echo 1 > /sys/kernel/debug/tracing/events/timer/enable
+#echo 1 > /sys/kernel/debug/tracing/events/workqueue/enable
+#echo 1 > /sys/kernel/debug/tracing/events/sched/sched_switch/enable
+#echo 1 > /sys/kernel/debug/tracing/events/sched/sched_migrate_task/enable
+#echo 1 > /sys/kernel/debug/tracing/events/sched/sched_wakeup/enable
+#echo 1 > /sys/kernel/debug/tracing/events/irq/enable
+#echo 1 > /sys/kernel/debug/tracing/events/irq_vectors/enable
+##echo 1 > /sys/kernel/debug/tracing/events/probe/enable
+#echo 1 > /sys/kernel/debug/tracing/tracing_on
+#cat /sys/kernel/debug/tracing/trace > trace.txt
+# do not forget to turn off the tracer
+#echo 0 > /sys/kernel/debug/tracing/tracing_on
 
