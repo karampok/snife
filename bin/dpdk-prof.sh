@@ -61,9 +61,11 @@ dmesg &>"$folder"/dmesg-B
 
 ps -ae -o pid= | xargs -n 1 taskset -cp &>"$folder"/ps-ae-opid-tasket-cp.output || true
 ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm,cls >"$folder"/ps-eo-pid-tid-class.output
-knit cpuaff -P /host/proc >"$folder"/knit_cpuaff.output
-knit irqaff -P /host/proc >"$folder"/knit_irqaff.output
-knit irqwatch -P /host/proc -C "$cpumask" -J  -T 10 |jq . > "$folder"/knit_irqwatch-C-j-t10.json
+#https://github.com/openshift-kni/debug-tools
+knit cpuaff -P /host/proc -C "$cpus" >"$folder"/knit_cpuaff_c.output
+knit irqaff -P /host/proc -C "$cpus" >"$folder"/knit_irqaff_c.output
+knit irqaff -P /host/proc -s -C "$cpus" >"$folder"/knit_irqaff_s_c.output
+knit irqwatch -P /host/proc -C "$cpus" -J -T 10 |jq . > "$folder"/knit_irqwatch_C_t10.json
 s-tui -j > "$folder"/s-tui.json
 lscpu --all --extended &>"$folder"/lscpu_all_extended
 lstopo -f "$folder"/lstopo.png 2>/dev/null
@@ -193,8 +195,9 @@ EOT
 chmod +x run-stats.sh
 
 ./run-stats.sh | tee results
-./run-ftrace.sh
-./run-perf.sh
+#./run-ftrace.sh
+#./run-ftrace-all.sh
+#./run-perf.sh
 # shellcheck disable=2002
 #cat results | tr '\n' ',' |  tr ' ' ',' >> /tmp/results.csv
 #echo "" >> /tmp/results.csv
