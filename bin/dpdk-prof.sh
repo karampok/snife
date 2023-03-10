@@ -2,7 +2,7 @@
 set -euo pipefail
 
 #TODO: arg to define with cache-miss or not
-# podman run --privileged --env-file=/home/core/envs -v /tmp:/tmp -v /:/host  --user=root --net=host --pid=host -it --rm quay.io/karampok/snife:latest dpdk-prof.sh
+# podman run --privileged --env-file=/home/core/envs -v /tmp:/tmp -v /:/host --user=root --net=host --pid=host -it --rm quay.io/karampok/snife:latest dpdk-prof.sh
 #LEFTMAC="{LEFTMAC-:-'12:20:04:2e:6d:20'}"
 #RIGHTMAC="{RIGHTMAC-:-'12:20:04:2e:6d:21'}"
 PROCESS=${PROCESS:-"dpdk-testpmd"}
@@ -33,9 +33,12 @@ cp "$0" . || true
 
 # TODO// run inside or outside container
 f=$(grep cpuset /proc/"$(pidof -s "$PROCESS")"/cgroup|awk -F: '{print "/host/sys/fs/cgroup/cpuset"$3"/cpuset.cpus"}')
-cpumask=$(grep Cpus_allowed: /proc/"$(pidof -s "$PROCESS")"/status|awk '{print $2}')
 cpus=$(cat "$f")
 echo "$cpus" > cpuset
+
+cpumask=$(grep Cpus_allowed: /proc/"$(pidof -s "$PROCESS")"/status|awk '{print $2}')
+f=$(cat /host/sys/fs/cgroup/cpuset/cpuset.cpus)
+allcpus=${f//-/ }
 
 CPU_ARRAY=$(echo "${cpus}" | awk '/-/{for (i=$1; i<=$2; i++)printf "%s%s",i,ORS;next} 1' RS=, FS=-) #1 2 3 4 53 54 55 56
 # shellcheck disable=2086,2116
@@ -58,6 +61,12 @@ dmesg &>"$folder"/dmesg-B
 
 ps -ae -o pid= | xargs -n 1 taskset -cp &>"$folder"/ps-ae-opid-tasket-cp.output || true
 ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm,cls >"$folder"/ps-eo-pid-tid-class.output
+knit cpuaff -P /host/proc >"$folder"/knit_cpuaff.output
+knit irqaff -P /host/proc >"$folder"/knit_irqaff.output
+knit irqwatch -P /host/proc -C "$cpumask" -J  -T 10 |jq . > "$folder"/knit_irqwatch-C-j-t10.json
+s-tui -j > "$folder"/s-tui.json
+lscpu --all --extended &>"$folder"/lscpu_all_extended
+lstopo -f "$folder"/lstopo.png 2>/dev/null
 sysctl -A >"$folder"/sysctl-A
 cat /host/proc/iomem &>"$folder"/proc_iomem
 cat /host/proc/sched_debug &>"$folder"/proc_sched_debug
@@ -114,12 +123,12 @@ done
 mkdir -p ftrace-sched_irq_vectors
 echo sched irq_vectors > /host/sys/kernel/debug/tracing/set_event
 echo 1 > /host/sys/kernel/debug/tracing/tracing_on && sleep 10 && echo 0 > /host/sys/kernel/debug/tracing/tracing_on
-#for c in \$(seq 0 63);do
 for c in $array;do
   cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > ftrace-sched_irq_vectors/cpu\$c.txt
 done
 echo > /host/sys/kernel/debug/tracing/set_event
 
+trace-cmd record -M $cpumask -e sched -e irq_vectors sleep 10 2>/dev/null
 # TODO echo  ffffffff,ffffffff > /host/sys/kernel/debug/tracing/tracing_cpumask
 EOT
 chmod +x run-ftrace.sh
@@ -129,19 +138,20 @@ cat <<EOT > run-ftrace-all.sh
 #! /bin/bash
 set -xeuo pipefail
 
-echo ff,ffffffff,ffffffff,ffffffff > /host/sys/kernel/debug/tracing/tracing_cpumask
+#echo ff,ffffffff,ffffffff,ffffffff > /host/sys/kernel/debug/tracing/tracing_cpumask
+echo ffffffff,ffffffff > /host/sys/kernel/debug/tracing/tracing_cpumask
 
-mkdir -p ftrace-sched_irq_vectors-all
+mkdir -p ftrace-all
 echo sched irq_vectors > /host/sys/kernel/debug/tracing/set_event
 echo stacktrace        > /host/sys/kernel/debug/tracing/events/sched/sched_switch/trigger
 echo 'stacktrace'      > /host/sys/kernel/debug/tracing/events/sched/sched_wakeup/trigger
 
 echo 1 > /host/sys/kernel/debug/tracing/tracing_on && sleep 10 && echo 0 > /host/sys/kernel/debug/tracing/tracing_on
 
-cat /host/sys/kernel/debug/tracing/trace > ftrace-sched_irq_vectors-all/trace
+cat /host/sys/kernel/debug/tracing/trace > ftrace-all/trace
 
-for c in \$(seq 0 63);do
-  cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > ftrace-sched_irq_vectors-all/cpu\$c.txt
+#for c in \$(seq $allcpus);do
+  cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > ftrace-all/cpu\$c.txt
 done
 
 echo > /host/sys/kernel/debug/tracing/set_event
@@ -189,12 +199,11 @@ chmod +x run-stats.sh
 #cat results | tr '\n' ',' |  tr ' ' ',' >> /tmp/results.csv
 #echo "" >> /tmp/results.csv
 
-echo tar -czvf "${folder##*/}"-tar.gz -C "$folder" .
+echo tar -czvf "${folder##*/}".tar.gz -C "$folder" .
 
 # TODO
 # hwlatdetect --threshold 5 --duration 600 --window 1000000 --width 950000
 
-# TODO knit tool
 # cho 0 > /sys/kernel/debug/tracing/tracing_on
 #echo 1 > /sys/kernel/debug/tracing/options/stacktrace
 #echo > /sys/kernel/debug/tracing/trace
@@ -211,3 +220,5 @@ echo tar -czvf "${folder##*/}"-tar.gz -C "$folder" .
 # do not forget to turn off the tracer
 #echo 0 > /sys/kernel/debug/tracing/tracing_on
 
+#TX is driver or firmware bc it means the application put the packets but the nic is nlt able to pull fast enough
+#Rx means the application doesn't pull fast enough
