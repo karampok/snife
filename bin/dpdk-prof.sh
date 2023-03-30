@@ -36,7 +36,8 @@ f=$(grep cpuset /proc/"$(pidof -s "$PROCESS")"/cgroup|awk -F: '{print "/host/sys
 cpus=$(cat "$f")
 echo "$cpus" > cpuset
 
-cpumask=$(grep Cpus_allowed: /proc/"$(pidof -s "$PROCESS")"/status|awk '{print $2}')
+ppid=$(grep  PPid /proc/"$(pidof -s "$PROCESS")"/status  |awk '{ print $2}')
+cpumask=$(grep Cpus_allowed: /proc/"$ppid"/status|awk '{print $2}')
 f=$(cat /host/sys/fs/cgroup/cpuset/cpuset.cpus)
 allcpus=${f//-/ }
 
@@ -126,42 +127,46 @@ mkdir -p ftrace-sched_irq_vectors
 echo sched irq_vectors > /host/sys/kernel/debug/tracing/set_event
 echo 1 > /host/sys/kernel/debug/tracing/tracing_on && sleep 10 && echo 0 > /host/sys/kernel/debug/tracing/tracing_on
 for c in $array;do
-  cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > ftrace-sched_irq_vectors/cpu\$c.txt
+  cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > ftrace-sched_irq_vectors/cpu\$c.trace
 done
 echo > /host/sys/kernel/debug/tracing/set_event
 
+perf record -C "$cpus" -A -a -e irq_vectors:local_timer_entry sleep 10 2>/dev/null
 trace-cmd record -M $cpumask -e sched -e irq_vectors sleep 10 2>/dev/null
 # TODO echo  ffffffff,ffffffff > /host/sys/kernel/debug/tracing/tracing_cpumask
 EOT
 chmod +x run-ftrace.sh
 
 
-cat <<EOT > run-ftrace-all.sh
+cat <<EOT > run-events.sh
 #! /bin/bash
 set -xeuo pipefail
 
 #echo ff,ffffffff,ffffffff,ffffffff > /host/sys/kernel/debug/tracing/tracing_cpumask
-echo ffffffff,ffffffff > /host/sys/kernel/debug/tracing/tracing_cpumask
+#echo ffffffff,ffffffff > /host/sys/kernel/debug/tracing/tracing_cpumask
 
-mkdir -p ftrace-all
-echo sched irq_vectors > /host/sys/kernel/debug/tracing/set_event
-echo stacktrace        > /host/sys/kernel/debug/tracing/events/sched/sched_switch/trigger
-echo 'stacktrace'      > /host/sys/kernel/debug/tracing/events/sched/sched_wakeup/trigger
-
+#enable the events you need :cat /host/sys/kernel/debug/tracing/available_events|grep irq
+echo irq_vectors:* sched:* > /host/sys/kernel/debug/tracing/set_event
+# enable stacktrace for the specific even to find the function call
+# echo stacktrace > /host/sys/kernel/debug/tracing/events/sched/sched_switch/trigger
+# echo stacktrace > /host/sys/kernel/debug/tracing/events/irq_vectors/reschedule_entry/trigger
+# e.g. reschedule_entry/ smp_reschedule_interrupt cause by function send_ipi
+# find that in all CPUS
+#echo *send_IPI* *send_ipi* > /host/sys/kernel/debug/set_ftrace_filter
+#echo function > /host/sys/kernel/debug/tracing/current_tracer
 echo 1 > /host/sys/kernel/debug/tracing/tracing_on && sleep 10 && echo 0 > /host/sys/kernel/debug/tracing/tracing_on
 
-cat /host/sys/kernel/debug/tracing/trace > ftrace-all/trace
-
-#for c in \$(seq $allcpus);do
-  cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > ftrace-all/cpu\$c.txt
+mkdir -p events-trace
+cat /host/sys/kernel/debug/tracing/trace > events-all/trace
+for c in \$(seq $allcpus);do
+  cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > events-all/cpu\$c.trace
+  echo > /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace
 done
 
-echo > /host/sys/kernel/debug/tracing/set_event
-echo '!stacktrace' > /host/sys/kernel/debug/tracing/events/sched/sched_switch/trigger
-echo '!stacktrace' > /host/sys/kernel/debug/tracing/events/sched/sched_wakeup/trigger
+trace-cmd reset
 
 EOT
-chmod +x run-ftrace-all.sh
+chmod +x run-event-trace.sh
 
 
 cat <<EOT > run-stats.sh
@@ -195,9 +200,9 @@ EOT
 chmod +x run-stats.sh
 
 ./run-stats.sh | tee results
-#./run-ftrace.sh
+./run-perf.sh
+./run-ftrace.sh
 #./run-ftrace-all.sh
-#./run-perf.sh
 # shellcheck disable=2002
 #cat results | tr '\n' ',' |  tr ' ' ',' >> /tmp/results.csv
 #echo "" >> /tmp/results.csv
