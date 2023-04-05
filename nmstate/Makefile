@@ -8,10 +8,7 @@ push: build
 	podman push $(NAME):$(VERSION)
 
 run: 
-	podman run --name nmstate --rm -d $(NAME):$(VERSION)
+	podman run --cap-add=NET_ADMIN,SYS_ADMIN --name nmstate --rm -d $(NAME):$(VERSION)
 
 exec: 
 	podman exec -it nmstate /bin/bash
-
-
-

@@ -1,3 +1,24 @@
 FROM quay.io/nmstate/c8s-nmstate-dev:v2.2.9
 
-RUN dnf update -y &&  dnf install -y nmstate
+RUN dnf update -y && \
+    dnf -y copr enable nmstate/nmstate-git && dnf install -y nmstate
+
+#RUN dnf update -y && dnf install -y nmstate
+
+RUN mkdir -p  /opt/nmstate
+COPY examples/* /opt/nmstate/
+WORKDIR /opt/nmstate
+#RUN dnf install -y https://kojipkgs.fedoraproject.org/packages/nmstate/2.2.9/2.fc37/x86_64/nmstate-2.2.9-2.fc37.x86_64.rpm
+
+#To get 2.10
+#$ sudo dnf copr enable nmstate/nmstate-git
+#$ sudo dnf copr enable nmstate/nispor
+#$ sudo dnf install -y nispor
+#$ sudo dnf install -y nmstate
+#
+#To uninstall 2.10 and reinstalled 1.1.0:
+#$ sudo dnf remove nmstate
+#$ sudo dnf remove nispor
+#$ sudo dnf copr disable  nmstate/nmstate-git
+#$ sudo dnf copr disable nmstate/nispor
+#$ sudo yum install nmstate

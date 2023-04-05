@@ -6,6 +6,7 @@ set -euo pipefail
 #LEFTMAC="{LEFTMAC-:-'12:20:04:2e:6d:20'}"
 #RIGHTMAC="{RIGHTMAC-:-'12:20:04:2e:6d:21'}"
 PROCESS=${PROCESS:-"dpdk-testpmd"}
+PID=$(pgrep -f "$PROCESS")
 INTERVAL=${INTERVAL:-"10"}
 
 #                    ┌─────────────────────────────────┐
@@ -32,11 +33,11 @@ mkdir -p "$folder"/ethtool && cd "$folder"
 cp "$0" . || true
 
 # TODO// run inside or outside container
-f=$(grep cpuset /proc/"$(pidof -s "$PROCESS")"/cgroup|awk -F: '{print "/host/sys/fs/cgroup/cpuset"$3"/cpuset.cpus"}')
+f=$(grep cpuset /proc/"$PID"/cgroup|awk -F: '{print "/host/sys/fs/cgroup/cpuset"$3"/cpuset.cpus"}')
 cpus=$(cat "$f")
 echo "$cpus" > cpuset
 
-ppid=$(grep  PPid /proc/"$(pidof -s "$PROCESS")"/status  |awk '{ print $2}')
+ppid=$(grep  PPid /proc/"$PID"/status  |awk '{ print $2}')
 cpumask=$(grep Cpus_allowed: /proc/"$ppid"/status|awk '{print $2}')
 f=$(cat /host/sys/fs/cgroup/cpuset/cpuset.cpus)
 allcpus=${f//-/ }
@@ -76,8 +77,8 @@ cat /host/proc/sched_debug &>"$folder"/proc_sched_debug
 cat /host/proc/cmdline &>"$folder"/proc_cmdline
 
 cpupower monitor -i 10 &>"$folder"/cpu_monitor.output
-pstree -p "$(pidof -s "$PROCESS")" &>"$folder"/pstree-p-process.output
-top -b -n 2 -H -p "$(pidof -s "$PROCESS")" &>"$folder"/top-b-n2-H-p-process.output
+pstree -p "$PID" &>"$folder"/pstree-p-process.output
+top -b -n 2 -H -p "$PID" &>"$folder"/top-b-n2-H-p-process.output
 
 cat <<EOT > run-perf.sh
 #! /bin/bash
@@ -92,6 +93,12 @@ done
 
 perf report --stdio --sort=comm,dso > perf/report_stdio_sort_commdso.output
 perf report --stdio > perf/report_stdio.output
+
+
+perf sched record -z -C  "$cpus"  -- sleep 10
+perf sched timehist
+Perf stat -C "$cpus" -A -a -e irq_vectors:* -e timer:*  sleep 10
+
 
 #perf top -C 0 -z -e cache-misses
 # TODO// add ./pcm-pcie.x
@@ -110,7 +117,7 @@ set -xeuo pipefail
 
 # https://www.kernel.org/doc/Documentation/trace/ftrace.txt
 # $cpus
-echo $cpumask > /host/sys/kernel/debug/tracing/tracing_cpumask
+# echo $cpumask > /host/sys/kernel/debug/tracing/tracing_cpumask
 
 for tracer in function_graph; do
   mkdir -p ftrace-\$tracer
@@ -138,7 +145,7 @@ EOT
 chmod +x run-ftrace.sh
 
 
-cat <<EOT > run-events.sh
+cat <<EOT > run-event-trace.sh
 #! /bin/bash
 set -xeuo pipefail
 
@@ -157,9 +164,9 @@ echo irq_vectors:* sched:* > /host/sys/kernel/debug/tracing/set_event
 echo 1 > /host/sys/kernel/debug/tracing/tracing_on && sleep 10 && echo 0 > /host/sys/kernel/debug/tracing/tracing_on
 
 mkdir -p events-trace
-cat /host/sys/kernel/debug/tracing/trace > events-all/trace
+cat /host/sys/kernel/debug/tracing/trace > events-trace/trace
 for c in \$(seq $allcpus);do
-  cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > events-all/cpu\$c.trace
+  cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > events-trace/cpu\$c.trace
   echo > /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace
 done
 
@@ -174,35 +181,39 @@ cat <<EOT > run-stats.sh
 set -euo pipefail
 
 # $PROCESS port 0 /left
-jq '.[].vfinfo_list[] | select(.address=="$LEFTMAC").stats.rx' ip_link_show_A.json > leftmac-rx-A.json
-jq '.[].vfinfo_list[] | select(.address=="$LEFTMAC").stats.rx' ip_link_show_B.json > leftmac-rx-B.json
-jq '.[].vfinfo_list[] | select(.address=="$LEFTMAC").stats.tx' ip_link_show_A.json > leftmac-tx-A.json
-jq '.[].vfinfo_list[] | select(.address=="$LEFTMAC").stats.tx' ip_link_show_B.json > leftmac-tx-B.json
+jq '.[].vfinfo_list[]? | select(.address=="$LEFTMAC").stats.rx' ip_link_show_A.json > leftmac-rx-A.json
+jq '.[].vfinfo_list[]? | select(.address=="$LEFTMAC").stats.rx' ip_link_show_B.json > leftmac-rx-B.json
+jq '.[].vfinfo_list[]? | select(.address=="$LEFTMAC").stats.tx' ip_link_show_A.json > leftmac-tx-A.json
+jq '.[].vfinfo_list[]? | select(.address=="$LEFTMAC").stats.tx' ip_link_show_B.json > leftmac-tx-B.json
 
 # $PROCESS port 0 /right
-jq '.[].vfinfo_list[] | select(.address=="$RIGHTMAC").stats.rx' ip_link_show_A.json > rightmac-rx-A.json
-jq '.[].vfinfo_list[] | select(.address=="$RIGHTMAC").stats.rx' ip_link_show_B.json > rightmac-rx-B.json
-jq '.[].vfinfo_list[] | select(.address=="$RIGHTMAC").stats.tx' ip_link_show_A.json > rightmac-tx-A.json
-jq '.[].vfinfo_list[] | select(.address=="$RIGHTMAC").stats.tx' ip_link_show_B.json > rightmac-tx-B.json
+jq '.[].vfinfo_list[]? | select(.address=="$RIGHTMAC").stats.rx' ip_link_show_A.json > rightmac-rx-A.json
+jq '.[].vfinfo_list[]? | select(.address=="$RIGHTMAC").stats.rx' ip_link_show_B.json > rightmac-rx-B.json
+jq '.[].vfinfo_list[]? | select(.address=="$RIGHTMAC").stats.tx' ip_link_show_A.json > rightmac-tx-A.json
+jq '.[].vfinfo_list[]? | select(.address=="$RIGHTMAC").stats.tx' ip_link_show_B.json > rightmac-tx-B.json
 
 echo "$folder"
 echo "Process: $PROCESS pod"
 echo "Interval: $INTERVAL sec"
-paste leftmac-rx-A.json leftmac-rx-B.json | awk '/"packets"/{printf "left-RX-pps %g\n", (\$4-\$2)/$INTERVAL}'
-paste leftmac-tx-A.json leftmac-tx-B.json | awk '/"tx_packets"/{printf "left-TX-pps %g\n", (\$4-\$2)/$INTERVAL}'
-paste leftmac-tx-A.json leftmac-tx-B.json
-paste rightmac-tx-A.json rightmac-tx-B.json | awk '/"tx_packets"/{printf "right-TX-pps %g\n", (\$4-\$2)/$INTERVAL}'
-paste rightmac-rx-A.json rightmac-rx-B.json | awk '/"packets"/{printf "right-RX-pps %g\n", (\$4-\$2)/$INTERVAL}'
-paste rightmac-rx-A.json rightmac-rx-B.json
+#paste leftmac-rx-A.json leftmac-rx-B.json | awk '/"packets"/{printf "left-RX-pps %g\n", (\$4-\$2)/$INTERVAL}'
+paste leftmac-rx-A.json leftmac-rx-B.json | awk '/"packets"/{printf "left-RX-pps %d\n", (\$4-\$2)}'
+#paste leftmac-tx-A.json leftmac-tx-B.json | awk '/"tx_packets"/{printf "left-TX-pps %g\n", (\$4-\$2)/$INTERVAL}'
+paste leftmac-tx-A.json leftmac-tx-B.json | awk '/"tx_packets"/{printf "left-TX-pps %d\n", (\$4-\$2)}'
+paste leftmac-tx-A.json leftmac-tx-B.json > paste-left
+#paste rightmac-tx-A.json rightmac-tx-B.json | awk '/"tx_packets"/{printf "right-TX-pps %g\n", (\$4-\$2)/$INTERVAL}'
+paste rightmac-tx-A.json rightmac-tx-B.json | awk '/"tx_packets"/{printf "right-TX-pps %d\n", (\$4-\$2)}'
+#paste rightmac-rx-A.json rightmac-rx-B.json | awk '/"packets"/{printf "right-RX-pps %g\n", (\$4-\$2)/$INTERVAL}'
+paste rightmac-rx-A.json rightmac-rx-B.json | awk '/"packets"/{printf "right-RX-pps %d\n", (\$4-\$2)}'
+paste rightmac-rx-A.json rightmac-rx-B.json > paste-right
 rm {left,right}mac*.json
 
 EOT
 chmod +x run-stats.sh
 
 ./run-stats.sh | tee results
-./run-perf.sh
-./run-ftrace.sh
-#./run-ftrace-all.sh
+#./run-perf.sh
+#./run-ftrace.sh
+#./run-event-trace.sh
 # shellcheck disable=2002
 #cat results | tr '\n' ',' |  tr ' ' ',' >> /tmp/results.csv
 #echo "" >> /tmp/results.csv
