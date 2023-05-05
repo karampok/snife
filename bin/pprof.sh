@@ -26,8 +26,8 @@ INTERVAL=${INTERVAL:-"10"}
 #                    └─────────────────────────────────┘
 
 
-TS=$(date +"%s")
-folder=/tmp/prof-"$TS"
+TS=$(date "+%y%m%d%H%M%S")
+folder=/tmp/pprof-"$TS"
 
 mkdir -p "$folder"/ethtool && cd "$folder"
 cp "$0" . || true
@@ -82,32 +82,24 @@ top -b -n 2 -H -p "$PID" &>"$folder"/top-b-n2-H-p-process.output
 
 cat <<EOT > run-perf.sh
 #! /bin/bash
-set -xeuo pipefail
+set -euo pipefail
 
 mkdir -p perf
 # $cpus
-perf record -z -C "$cpus" sleep "$INTERVAL"
+perf record -z -C "$cpus" -- sleep "$INTERVAL" 2>/dev/null
 for c in $array;do
-  perf report -C \$c --stdio > perf/report_stdio_cpu\$c.output
+  perf report -C \$c --stdio > perf/report_stdio_cpu\$c.out
 done
 
 perf report --stdio --sort=comm,dso > perf/report_stdio_sort_commdso.output
 perf report --stdio > perf/report_stdio.output
 
+perf sched record -z -C "$cpus" -- sleep "$INTERVAL" 2>/dev/null
+for c in $array;do
+  perf sched timehist -C \$c  2>&1  > perf/sched_timehist_\$c.out
+done
 
-perf sched record -z -C  "$cpus"  -- sleep 10
-perf sched timehist > perf/perf_sched_timehist
-perf stat -C "$cpus" -A -a -e irq_vectors:* -e timer:*  sleep 10 2>&1 > perf/perf_stat
 
-
-#perf top -C 0 -z -e cache-misses
-# TODO// add ./pcm-pcie.x
-#for y in pcm pcm-memory pcm-numa; do
-#  \$c 5 -i=2 >"$folder"/"\$c"_5_i2.output 2>&1
-#done
-#TODO:// perf record -C 0 -z -e cache-misses -- check the output file
-
-echo "for f in bad-prof/perf/*;do nvim -d {good,bad}-prof/perf/${f##*/};read -n 1 ;done"
 EOT
 chmod +x run-perf.sh
 
@@ -117,7 +109,7 @@ set -euo pipefail
 
 # https://www.kernel.org/doc/Documentation/trace/ftrace.txt
 # $cpus
-# echo $cpumask > /host/sys/kernel/debug/tracing/tracing_cpumask
+echo $cpumask > /host/sys/kernel/debug/tracing/tracing_cpumask
 
 for tracer in function_graph; do
   mkdir -p ftrace-\$tracer
@@ -125,7 +117,7 @@ for tracer in function_graph; do
   echo 1 > /host/sys/kernel/debug/tracing/tracing_on && sleep 10 && echo 0 > /host/sys/kernel/debug/tracing/tracing_on
 
   for c in $array;do
-    cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > ftrace-\$tracer/cpu\$c.txt
+    cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > ftrace-\$tracer/cpu\$c.trace
   done
   echo nop > /host/sys/kernel/debug/tracing/current_tracer
 done
@@ -138,9 +130,8 @@ for c in $array;do
 done
 echo > /host/sys/kernel/debug/tracing/set_event
 
-perf record -C "$cpus" -A -a -e irq_vectors:local_timer_entry sleep 10 2>/dev/null
-trace-cmd record -M $cpumask -e sched -e irq_vectors sleep 10 2>/dev/null
 # TODO echo  ffffffff,ffffffff > /host/sys/kernel/debug/tracing/tracing_cpumask
+trace-cmd reset
 EOT
 chmod +x run-ftrace.sh
 
@@ -149,11 +140,9 @@ cat <<EOT > run-event-trace.sh
 #! /bin/bash
 set -euo pipefail
 
-#echo ff,ffffffff,ffffffff,ffffffff > /host/sys/kernel/debug/tracing/tracing_cpumask
-#echo ffffffff,ffffffff > /host/sys/kernel/debug/tracing/tracing_cpumask
-
 #enable the events you need :cat /host/sys/kernel/debug/tracing/available_events|grep irq
 echo irq_vectors:* sched:* > /host/sys/kernel/debug/tracing/set_event
+
 # enable stacktrace for the specific even to find the function call
 # echo stacktrace > /host/sys/kernel/debug/tracing/events/sched/sched_switch/trigger
 # echo stacktrace > /host/sys/kernel/debug/tracing/events/irq_vectors/reschedule_entry/trigger
@@ -161,6 +150,7 @@ echo irq_vectors:* sched:* > /host/sys/kernel/debug/tracing/set_event
 # find that in all CPUS
 #echo *send_IPI* *send_ipi* > /host/sys/kernel/debug/set_ftrace_filter
 #echo function > /host/sys/kernel/debug/tracing/current_tracer
+
 echo 1 > /host/sys/kernel/debug/tracing/tracing_on && sleep 10 && echo 0 > /host/sys/kernel/debug/tracing/tracing_on
 
 mkdir -p events-trace
@@ -192,9 +182,7 @@ jq '.[].vfinfo_list[]? | select(.address=="$RIGHTMAC").stats.rx' ip_link_show_B.
 jq '.[].vfinfo_list[]? | select(.address=="$RIGHTMAC").stats.tx' ip_link_show_A.json > rightmac-tx-A.json
 jq '.[].vfinfo_list[]? | select(.address=="$RIGHTMAC").stats.tx' ip_link_show_B.json > rightmac-tx-B.json
 
-echo "$folder"
-echo "Process: $PROCESS pod"
-echo "Interval: $INTERVAL sec"
+echo "process $PROCESS profile $folder"
 #paste leftmac-rx-A.json leftmac-rx-B.json | awk '/"packets"/{printf "left-RX-pps %g\n", (\$4-\$2)/$INTERVAL}'
 paste leftmac-rx-A.json leftmac-rx-B.json | awk '/"packets"/{printf "left-RX-pps %d\n", (\$4-\$2)}'
 #paste leftmac-tx-A.json leftmac-tx-B.json | awk '/"tx_packets"/{printf "left-TX-pps %g\n", (\$4-\$2)/$INTERVAL}'
@@ -211,12 +199,13 @@ EOT
 chmod +x run-stats.sh
 
 ./run-stats.sh | tee results
-./run-perf.sh | true
-./run-ftrace.sh | true
-./run-event-trace.sh | true
+./run-perf.sh || true
+./run-event-trace.sh || true
+#time ./run-ftrace.sh || true
+
 # shellcheck disable=2002
-#cat results | tr '\n' ',' |  tr ' ' ',' >> /tmp/results.csv
-#echo "" >> /tmp/results.csv
+cat results | tr '\n' ',' |  tr ' ' ',' >> /tmp/results.csv
+echo "" >> /tmp/results.csv
 
 echo tar -czvf "${folder##*/}".tar.gz -C "$folder" .
 
@@ -241,3 +230,14 @@ echo tar -czvf "${folder##*/}".tar.gz -C "$folder" .
 
 #TX is driver or firmware bc it means the application put the packets but the nic is nlt able to pull fast enough
 #Rx means the application doesn't pull fast enough
+#
+# perf record -C "$cpus" -A -a -e irq_vectors:local_timer_entry sleep 10 2>/dev/null
+# trace-cmd record -M $cpumask -e sched -e irq_vectors sleep 10 2>/dev/null
+##perf top -C 0 -z -e cache-misses
+# TODO// add ./pcm-pcie.x
+#for y in pcm pcm-memory pcm-numa; do
+#  \$c 5 -i=2 >"$folder"/"\$c"_5_i2.output 2>&1
+#done
+#TODO:// perf record -C 0 -z -e cache-misses -- check the output file
+# echo "for f in bad-prof/perf/*;do nvim -d {good,bad}-prof/perf/${f##*/};read -n 1 ;done"
+# perf stat -C "$cpus" -A -a -e irq_vectors:* -e timer:*  sleep 10 2>&1 > perf/perf_stat
