@@ -1,7 +1,7 @@
 FROM alpine:3.11 AS build
 
 ARG CHANNEL=stable
-ARG VERSION=1.30.2
+ARG VERSION=1.38.4
 ARG ARCH=amd64
 
 RUN mkdir /build
@@ -18,10 +18,10 @@ LABEL description="Run container"
 
 RUN dnf install -y numactl strace ipcalc iptables file bind-utils tcpdump nmap-ncat iputils iproute \ 
   pip openssl coreos-installer dnf-plugin-config-manager tmux dhcp-client openssh-clients wget nmstate procps-ng hwloc-gui hwloc \ 
-  libvirt-devel mosh gcc python3-devel git mosh stress bridge-utils conntrack-tools vim htop jq xz && dnf clean all
+  tree libvirt-devel mosh gcc python3-devel git mosh stress bridge-utils conntrack-tools vim htop jq xz && dnf clean all
 
 RUN setcap 'cap_net_raw+ep' /usr/sbin/tcpdump
-RUN curl https://raw.githubusercontent.com/karmab/kcli/main/install.sh | sudo bash
+#RUN curl https://raw.githubusercontent.com/karmab/kcli/main/install.sh | sudo bash
 
 RUN cd /tmp \ 
   && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.12/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && tar xvfz openshift-client-linux.tar.gz \
@@ -34,6 +34,7 @@ RUN printf 'tailscale up --ssh -auth-key=$TS_AUTH --hostname infra --advertise-r
 #tailscale up --ssh -auth-key=$TS_AUTH --hostname infra --advertise-routes "10.10.10.0/24,2600:52:52:52::/64"
 RUN printf 'mutagen-agent install\n' >> /etc/motd
 RUN printf 'mosh root@infra-kvm -- tmux attach -t 0 -d\n' >> /etc/motd
+RUN printf 'mkdir -p  /isos && python3 - /isos -m http.server 9000\n' >> /etc/motd
 
 USER root
 CMD ["tailscaled"]
