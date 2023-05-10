@@ -5,8 +5,10 @@ ENV TREX_VERSION ${TREX_VERSION}
 # from https://trex-tgn.cisco.com/trex/doc/release_notes.html
 
 # install requirements
-RUN dnf install -y --nodocs tmux git wget procps python3 vim python3-pip pciutils gettext https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && dnf clean all
-RUN dnf install -y --nodocs hostname jq iproute net-tools ethtool nmap iputils perf numactl sysstat htop rdma-core-devel libibverbs libibverbs-devel net-tools && dnf clean all
+RUN dnf install -y --nodocs tmux git wget procps python3 vim python3-pip pciutils \
+      gettext https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && dnf clean all
+RUN dnf install -y --nodocs hostname jq iproute net-tools ethtool nmap iputils perf numactl \
+      mstflint binutils sysstat htop rdma-core-devel libibverbs libibverbs-devel net-tools && dnf clean all
 
 # install trex server
 WORKDIR /opt/

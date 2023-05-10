@@ -26,10 +26,10 @@ INTERVAL=${INTERVAL:-"10"}
 #                    └─────────────────────────────────┘
 
 
-TS=$(date "+%y%m%d%H%M%S")
-folder=/tmp/pprof-"$TS"
+TS=$(awk -F . '{print $1;}' /proc/uptime)
+folder=/tmp/pprof-"$PROCESS"/"$TS"
 
-mkdir -p "$folder"/ethtool && cd "$folder"
+mkdir -p "$folder"/ethtool-{A,B} && cd "$folder"
 cp "$0" . || true
 
 # TODO// run inside or outside container
@@ -47,38 +47,55 @@ CPU_ARRAY=$(echo "${cpus}" | awk '/-/{for (i=$1; i<=$2; i++)printf "%s%s",i,ORS;
 array=$(echo ${CPU_ARRAY})
 
 dmesg &>"$folder"/dmesg-A
+numastat -p "$PID" &>"$folder"/numastat-A
 cat /host/proc/interrupts &>"$folder"/proc_interrupts-A
 
 # TODO add ens under ENV
 # TODO ethtool folder to be given as var
-ip --json link| jq -r '.[] | select(.ifname | startswith("ens")).ifname' | xargs -i sh -c 'ethtool -S {} &> ethtool/s-{}-A'
+ip --json link| jq -r '.[] | select(.ifname | startswith("ens")).ifname' | xargs -i sh -c 'ethtool -S {} &> ethtool-A/s-{}'
 echo "TIMESTAMP A - $(date +"%s")"
 ip -s -s --json link|jq '.[] | select(.ifname | startswith("ens"))' | jq -s '.' > ip_link_show_A.json
 sleep "$INTERVAL"
 ip -s -s --json link|jq '.[] | select(.ifname | startswith("ens"))' | jq -s '.' > ip_link_show_B.json
 echo "TIMESTAMP B - $(date +"%s")"
-ip --json link| jq -r '.[] | select(.ifname | startswith("ens")).ifname' | xargs -i sh -c 'ethtool -S {} &> ethtool/s-{}-B'
+ip --json link| jq -r '.[] | select(.ifname | startswith("ens")).ifname' | xargs -i sh -c 'ethtool -S {} &> ethtool-B/s-{}'
+
 cat /host/proc/interrupts &>"$folder"/proc_interrupts-B
 dmesg &>"$folder"/dmesg-B
+numastat -p "$PID" &>"$folder"/numastat-B
 
-ps -ae -o pid= | xargs -n 1 taskset -cp &>"$folder"/ps-ae-opid-tasket-cp.output || true
-ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm,cls >"$folder"/ps-eo-pid-tid-class.output
+ps -ae -o pid= | xargs -n 1 taskset -cp &>"$folder"/ps-ae-opid-tasket-cp || true
+ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:14,comm,cls >"$folder"/ps-eo-pid-tid-class
+ps  -o uname,pid,ppid,cmd,cls,psr --deselect &>"$folder"/ps-o_unmae,pid,ppid,cmd,cls,psr--deselect
+pstree -p "$PID" &>"$folder"/pstree-p-process
+
 #https://github.com/openshift-kni/debug-tools
-knit cpuaff -P /host/proc -C "$cpus" >"$folder"/knit_cpuaff_c.output
-knit irqaff -P /host/proc -C "$cpus" >"$folder"/knit_irqaff_c.output
-knit irqaff -P /host/proc -s -C "$cpus" >"$folder"/knit_irqaff_s_c.output
-knit irqwatch -P /host/proc -C "$cpus" -J -T 10 |jq . > "$folder"/knit_irqwatch_C_t10.json
-s-tui -j > "$folder"/s-tui.json
-lscpu --all --extended &>"$folder"/lscpu_all_extended
-lstopo -f "$folder"/lstopo.png 2>/dev/null
-sysctl -A >"$folder"/sysctl-A
+knit cpuaff -P /host/proc -C "$cpus" >"$folder"/knit_cpuaff_c
+knit irqaff -P /host/proc -C "$cpus" >"$folder"/knit_irqaff_c
+knit irqaff -P /host/proc -s -C "$cpus" >"$folder"/knit_irqaff_s_c
+
 cat /host/proc/iomem &>"$folder"/proc_iomem
 cat /host/proc/sched_debug &>"$folder"/proc_sched_debug
 cat /host/proc/cmdline &>"$folder"/proc_cmdline
+#top -b -n 2 -H -p "$PID" &>"$folder"/top-b-n2-H-p-process
+#knit irqwatch -P /host/proc -C "$cpus" -J -T 10 |jq . > "$folder"/knit_irqwatch_C_t10.json
+#sysctl -A >"$folder"/sysctl-A
 
-cpupower monitor -i 10 &>"$folder"/cpu_monitor.output
-pstree -p "$PID" &>"$folder"/pstree-p-process.output
-top -b -n 2 -H -p "$PID" &>"$folder"/top-b-n2-H-p-process.output
+cat <<EOT > run-pcm.sh
+#! /bin/bash
+set -euo pipefail
+
+mkdir -p pcm
+for c in pcm pcm-memory pcm-numa pcm-iio pcm-power; do
+  \$c 5 -i=2 >pcm/"\$c"_5_i2 2>&1
+done
+
+lscpu --all --extended &>pcm/lscpu_all_extended
+lstopo -f pcm/lstopo.png 2>/dev/null
+cpupower monitor -i 10 &>pcm/cpu_monitor
+s-tui -j > pcm/s-tui.json
+EOT
+chmod +x run-pcm.sh
 
 cat <<EOT > run-perf.sh
 #! /bin/bash
@@ -91,15 +108,13 @@ for c in $array;do
   perf report -C \$c --stdio > perf/report_stdio_cpu\$c.out
 done
 
-perf report --stdio --sort=comm,dso > perf/report_stdio_sort_commdso.output
-perf report --stdio > perf/report_stdio.output
+perf report --stdio --sort=comm,dso > perf/report_stdio_sort_commdso
+perf report --stdio > perf/report_stdio
 
 perf sched record -z -C "$cpus" -- sleep "$INTERVAL" 2>/dev/null
 for c in $array;do
   perf sched timehist -C \$c  2>&1  > perf/sched_timehist_\$c.out
 done
-
-
 EOT
 chmod +x run-perf.sh
 
@@ -182,30 +197,23 @@ jq '.[].vfinfo_list[]? | select(.address=="$RIGHTMAC").stats.rx' ip_link_show_B.
 jq '.[].vfinfo_list[]? | select(.address=="$RIGHTMAC").stats.tx' ip_link_show_A.json > rightmac-tx-A.json
 jq '.[].vfinfo_list[]? | select(.address=="$RIGHTMAC").stats.tx' ip_link_show_B.json > rightmac-tx-B.json
 
-echo "process $PROCESS profile $folder"
-#paste leftmac-rx-A.json leftmac-rx-B.json | awk '/"packets"/{printf "left-RX-pps %g\n", (\$4-\$2)/$INTERVAL}'
-paste leftmac-rx-A.json leftmac-rx-B.json | awk '/"packets"/{printf "left-RX-pps %d\n", (\$4-\$2)}'
-#paste leftmac-tx-A.json leftmac-tx-B.json | awk '/"tx_packets"/{printf "left-TX-pps %g\n", (\$4-\$2)/$INTERVAL}'
-paste leftmac-tx-A.json leftmac-tx-B.json | awk '/"tx_packets"/{printf "left-TX-pps %d\n", (\$4-\$2)}'
-paste leftmac-tx-A.json leftmac-tx-B.json > paste-left
-#paste rightmac-tx-A.json rightmac-tx-B.json | awk '/"tx_packets"/{printf "right-TX-pps %g\n", (\$4-\$2)/$INTERVAL}'
-paste rightmac-tx-A.json rightmac-tx-B.json | awk '/"tx_packets"/{printf "right-TX-pps %d\n", (\$4-\$2)}'
-#paste rightmac-rx-A.json rightmac-rx-B.json | awk '/"packets"/{printf "right-RX-pps %g\n", (\$4-\$2)/$INTERVAL}'
-paste rightmac-rx-A.json rightmac-rx-B.json | awk '/"packets"/{printf "right-RX-pps %d\n", (\$4-\$2)}'
-paste rightmac-rx-A.json rightmac-rx-B.json > paste-right
+LRX=\$(paste leftmac-rx-A.json leftmac-rx-B.json | awk '/"packets"/{printf "%d\n", (\$4-\$2)/10}')
+LTX=\$(paste leftmac-tx-A.json leftmac-tx-B.json | awk '/"tx_packets"/{printf "%d\n", (\$4-\$2)/10}')
+RRX=\$(paste rightmac-rx-A.json rightmac-rx-B.json | awk '/"packets"/{printf "%d\n", (\$4-\$2)/10}')
+RTX=\$(paste rightmac-tx-A.json rightmac-tx-B.json | awk '/"tx_packets"/{printf "%d\n", (\$4-\$2)/10}')
 rm {left,right}mac*.json
-
+echo " ens1fX|$LEFTMAC--- $PROCESS --- $RIGHTMAC|ens1fY "
+echo "TS(sec),LRX(pps),LTX(pps),RRX(pps),RTX(pps)"
+echo "$TS,\$LRX,\$LTX,\$RRX,\$RTX"
+echo "$TS,\$LRX,\$LTX,\$RRX,\$RTX" >> /$folder/../results.csv
 EOT
 chmod +x run-stats.sh
 
 ./run-stats.sh | tee results
 ./run-perf.sh || true
+./run-pcm.sh || true
 ./run-event-trace.sh || true
-#time ./run-ftrace.sh || true
-
-# shellcheck disable=2002
-cat results | tr '\n' ',' |  tr ' ' ',' >> /tmp/results.csv
-echo "" >> /tmp/results.csv
+#./run-ftrace.sh || true
 
 echo tar -czvf "${folder##*/}".tar.gz -C "$folder" .
 
@@ -229,15 +237,13 @@ echo tar -czvf "${folder##*/}".tar.gz -C "$folder" .
 #echo 0 > /sys/kernel/debug/tracing/tracing_on
 
 #TX is driver or firmware bc it means the application put the packets but the nic is nlt able to pull fast enough
+#
 #Rx means the application doesn't pull fast enough
 #
 # perf record -C "$cpus" -A -a -e irq_vectors:local_timer_entry sleep 10 2>/dev/null
 # trace-cmd record -M $cpumask -e sched -e irq_vectors sleep 10 2>/dev/null
 ##perf top -C 0 -z -e cache-misses
 # TODO// add ./pcm-pcie.x
-#for y in pcm pcm-memory pcm-numa; do
-#  \$c 5 -i=2 >"$folder"/"\$c"_5_i2.output 2>&1
-#done
-#TODO:// perf record -C 0 -z -e cache-misses -- check the output file
+#TODO:// perf record -C 0 -z -e cache-misses -- check the file
 # echo "for f in bad-prof/perf/*;do nvim -d {good,bad}-prof/perf/${f##*/};read -n 1 ;done"
 # perf stat -C "$cpus" -A -a -e irq_vectors:* -e timer:*  sleep 10 2>&1 > perf/perf_stat
