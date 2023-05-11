@@ -21,11 +21,13 @@ CPUS=""
 NUM=0
 for i in "${ACPUS[@]}"; do
   if [ "$i" == "$LATENCY" ]; then
-    # We drop all siblings
-    break
+    break # We drop all siblings
   fi
   CPUS="$CPUS,$i"
   NUM=$(("$NUM" + 1))
+  if [[ "$NUM" == "${NBCORES:--1}" ]]; then  # forwarding cores
+    break
+  fi
 done
 CPUS="${CPUS:1}"
 
@@ -42,6 +44,6 @@ RIGHT=$(echo "$NETINFO" | jq -r '.[] | select(.interface=="net2")."device-info".
 NBCORES=${NBCORES:-$NUM}
 : "${CHANNELS:-4}"
 
-dpdk-testpmd -l "$MASTER,$CPUS" -a "$LEFT" -a "$RIGHT" -n "$CHANNELS" \
+exec dpdk-testpmd -l "$MASTER,$CPUS" -a "$LEFT" -a "$RIGHT" -n "$CHANNELS" \
   -- --nb-cores="$NUM" --forward-mode=mac --rxd=2048 --txd=2048  \
   --eth-peer=0,"$LEFT_MAC" --eth-peer=1,"$RIGHT_MAC" --auto-start --stats-period 10

@@ -7,6 +7,7 @@ set -euo pipefail
 #RIGHTMAC="{RIGHTMAC-:-'12:20:04:2e:6d:21'}"
 PROCESS=${PROCESS:-"dpdk-testpmd"}
 PID=$(pgrep -f "$PROCESS")
+
 INTERVAL=${INTERVAL:-"10"}
 
 #                    ┌─────────────────────────────────┐
@@ -33,9 +34,13 @@ mkdir -p "$folder"/ethtool-{A,B} && cd "$folder"
 cp "$0" . || true
 
 # TODO// run inside or outside container
+#
+cdir=$(grep cpu,cpuacct /proc/"$PID"/cgroup | awk -F: '{print "/host/sys/fs/cgroup/cpu,cpuacct"$3}')
 f=$(grep cpuset /proc/"$PID"/cgroup|awk -F: '{print "/host/sys/fs/cgroup/cpuset"$3"/cpuset.cpus"}')
 cpus=$(cat "$f")
 echo "$cpus" > cpuset
+
+f=$(grep cpuset /proc/"$PID"/cgroup|awk -F: '{print "/host/sys/fs/cgroup/cpuset"$3"/cpuset.cpus"}')
 
 ppid=$(grep  PPid /proc/"$PID"/status  |awk '{ print $2}')
 cpumask=$(grep Cpus_allowed: /proc/"$ppid"/status|awk '{print $2}')
@@ -49,17 +54,19 @@ array=$(echo ${CPU_ARRAY})
 dmesg &>"$folder"/dmesg-A
 numastat -p "$PID" &>"$folder"/numastat-A
 cat /host/proc/interrupts &>"$folder"/proc_interrupts-A
+cd "$cdir";grep -rRH . &>"$folder"/cgroup-cpu-A ; cd - >/dev/null
 
 # TODO add ens under ENV
 # TODO ethtool folder to be given as var
 ip --json link| jq -r '.[] | select(.ifname | startswith("ens")).ifname' | xargs -i sh -c 'ethtool -S {} &> ethtool-A/s-{}'
-echo "TIMESTAMP A - $(date +"%s")"
+#echo "TIMESTAMP A - $(date +"%s")"
 ip -s -s --json link|jq '.[] | select(.ifname | startswith("ens"))' | jq -s '.' > ip_link_show_A.json
 sleep "$INTERVAL"
 ip -s -s --json link|jq '.[] | select(.ifname | startswith("ens"))' | jq -s '.' > ip_link_show_B.json
-echo "TIMESTAMP B - $(date +"%s")"
+#echo "TIMESTAMP B - $(date +"%s")"
 ip --json link| jq -r '.[] | select(.ifname | startswith("ens")).ifname' | xargs -i sh -c 'ethtool -S {} &> ethtool-B/s-{}'
 
+cd "$cdir";grep -rRH . &>"$folder"/cgroup-cpu-A ; cd - >/dev/null
 cat /host/proc/interrupts &>"$folder"/proc_interrupts-B
 dmesg &>"$folder"/dmesg-B
 numastat -p "$PID" &>"$folder"/numastat-B
@@ -77,9 +84,9 @@ knit irqaff -P /host/proc -s -C "$cpus" >"$folder"/knit_irqaff_s_c
 cat /host/proc/iomem &>"$folder"/proc_iomem
 cat /host/proc/sched_debug &>"$folder"/proc_sched_debug
 cat /host/proc/cmdline &>"$folder"/proc_cmdline
-#top -b -n 2 -H -p "$PID" &>"$folder"/top-b-n2-H-p-process
-#knit irqwatch -P /host/proc -C "$cpus" -J -T 10 |jq . > "$folder"/knit_irqwatch_C_t10.json
-#sysctl -A >"$folder"/sysctl-A
+top -b -n 2 -H -p "$PID" &>"$folder"/top-b-n2-H-p-process
+knit irqwatch -P /host/proc -C "$cpus" -J -T 10 |jq . > "$folder"/knit_irqwatch_C_t10.json
+sysctl -A >"$folder"/sysctl-A
 
 cat <<EOT > run-pcm.sh
 #! /bin/bash
@@ -120,7 +127,7 @@ chmod +x run-perf.sh
 
 cat <<EOT > run-ftrace.sh
 #! /bin/bash
-set -euo pipefail
+set -uo pipefail
 
 # https://www.kernel.org/doc/Documentation/trace/ftrace.txt
 # $cpus
@@ -131,7 +138,8 @@ for tracer in function_graph; do
   echo \$tracer > /host/sys/kernel/debug/tracing/current_tracer
   echo 1 > /host/sys/kernel/debug/tracing/tracing_on && sleep 10 && echo 0 > /host/sys/kernel/debug/tracing/tracing_on
 
-  for c in $array;do
+# for c in \$(seq $allcpus);do
+for c in $array;do
     cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > ftrace-\$tracer/cpu\$c.trace
   done
   echo nop > /host/sys/kernel/debug/tracing/current_tracer
@@ -140,6 +148,8 @@ done
 mkdir -p ftrace-sched_irq_vectors
 echo sched irq_vectors > /host/sys/kernel/debug/tracing/set_event
 echo 1 > /host/sys/kernel/debug/tracing/tracing_on && sleep 10 && echo 0 > /host/sys/kernel/debug/tracing/tracing_on
+
+# for c in \$(seq $allcpus);do
 for c in $array;do
   cat /host/sys/kernel/debug/tracing/per_cpu/cpu\$c/trace > ftrace-sched_irq_vectors/cpu\$c.trace
 done
@@ -153,7 +163,7 @@ chmod +x run-ftrace.sh
 
 cat <<EOT > run-event-trace.sh
 #! /bin/bash
-set -euo pipefail
+set -uo pipefail
 
 #enable the events you need :cat /host/sys/kernel/debug/tracing/available_events|grep irq
 echo irq_vectors:* sched:* > /host/sys/kernel/debug/tracing/set_event
@@ -183,7 +193,7 @@ chmod +x run-event-trace.sh
 
 cat <<EOT > run-stats.sh
 #! /bin/bash
-set -euo pipefail
+set -uo pipefail
 
 # $PROCESS port 0 /left
 jq '.[].vfinfo_list[]? | select(.address=="$LEFTMAC").stats.rx' ip_link_show_A.json > leftmac-rx-A.json
@@ -202,18 +212,18 @@ LTX=\$(paste leftmac-tx-A.json leftmac-tx-B.json | awk '/"tx_packets"/{printf "%
 RRX=\$(paste rightmac-rx-A.json rightmac-rx-B.json | awk '/"packets"/{printf "%d\n", (\$4-\$2)/10}')
 RTX=\$(paste rightmac-tx-A.json rightmac-tx-B.json | awk '/"tx_packets"/{printf "%d\n", (\$4-\$2)/10}')
 rm {left,right}mac*.json
-echo " ens1fX|$LEFTMAC--- $PROCESS --- $RIGHTMAC|ens1fY "
-echo "TS(sec),LRX(pps),LTX(pps),RRX(pps),RTX(pps)"
-echo "$TS,\$LRX,\$LTX,\$RRX,\$RTX"
-echo "$TS,\$LRX,\$LTX,\$RRX,\$RTX" >> /$folder/../results.csv
+echo "== [ens1fX|vf $LEFTMAC] --- <$PROCESS> --- [vf $RIGHTMAC|ens1fY] == "
+echo "TS(sec),LRX(pps),RRX(pps),LTX(pps),RTX(pps),profile"
+echo "$TS,\$LRX,\$RRX,\$LTX,\$RTX,$folder"
+echo "$TS,\$LRX,\$RRX,\$LTX,\$RTX,$folder" >> /$folder/../results.csv
 EOT
 chmod +x run-stats.sh
 
 ./run-stats.sh | tee results
-./run-perf.sh || true
-./run-pcm.sh || true
+./run-perf.sh
+./run-pcm.sh
 ./run-event-trace.sh || true
-#./run-ftrace.sh || true
+[[ "${FTRACE:-""}" != "" ]] && ./run-ftrace.sh
 
 echo tar -czvf "${folder##*/}".tar.gz -C "$folder" .
 

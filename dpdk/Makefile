@@ -1,7 +1,7 @@
 NAME = quay.io/karampok/dpdk
 VERSION = 21.11.1
 
-build: 
+build:
 	podman build --rm --build-arg DPDK_VERSION=$(VERSION) -t $(NAME):$(VERSION) .
 
 push: build

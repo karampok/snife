@@ -2,7 +2,7 @@
 #RUN dnf install -y tmux
 #COPY --from=CP /usr/bin/tmux /usr/bin/
 
-FROM registry.redhat.io/openshift4/dpdk-base-rhel8:v4.11.3-8.1669833139
+FROM registry.redhat.io/openshift4/dpdk-base-rhel8:v4.9.15-2.1682303973
 #https://catalog.redhat.com/software/containers/openshift4/dpdk-base-rhel8/5e32be6cdd19c77896004a41?container-tabs=overview
 
 #RUN sudo dnf install -y tmux
@@ -13,7 +13,6 @@ FROM registry.redhat.io/openshift4/dpdk-base-rhel8:v4.11.3-8.1669833139
 
 COPY start-testpmd.sh /usr/local/bin/
 COPY jq /usr/local/bin/
-
 
 # # https://github.com/redhat-nfvpe/container-perf-tools/tree/master/standalone-testpmd
 # # https://github.com/SchSeba/dpdk-testpm-trex-example/blob/main/Dockerfile-dpdk
