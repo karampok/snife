@@ -28,7 +28,7 @@ INTERVAL=${INTERVAL:-"10"}
 
 
 TS=$(awk -F . '{print $1;}' /proc/uptime)
-folder=/tmp/pprof-"$PROCESS"/"$TS"
+folder=/tmp/pprof-"${PROCESS// /_}"/"$TS"
 
 mkdir -p "$folder"/ethtool-{A,B} && cd "$folder"
 cp "$0" . || true
@@ -79,6 +79,7 @@ pstree -p "$PID" &>"$folder"/pstree-p-process
 #https://github.com/openshift-kni/debug-tools
 knit cpuaff -P /host/proc -C "$cpus" >"$folder"/knit_cpuaff_c
 knit irqaff -P /host/proc -C "$cpus" >"$folder"/knit_irqaff_c
+knit irqaff -P /host/proc  >"$folder"/knit_irqaff
 knit irqaff -P /host/proc -s -C "$cpus" >"$folder"/knit_irqaff_s_c
 
 cat /host/proc/iomem &>"$folder"/proc_iomem
@@ -220,9 +221,9 @@ EOT
 chmod +x run-stats.sh
 
 ./run-stats.sh | tee results
-./run-perf.sh
-./run-pcm.sh
-./run-event-trace.sh || true
+#./run-perf.sh
+#./run-pcm.sh
+#./run-event-trace.sh || true
 [[ "${FTRACE:-""}" != "" ]] && ./run-ftrace.sh
 
 echo tar -czvf "${folder##*/}".tar.gz -C "$folder" .

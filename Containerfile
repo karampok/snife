@@ -18,7 +18,6 @@ RUN cd /tmp \
   && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.12/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && tar xvfz openshift-client-linux.tar.gz \
   && mv oc kubectl /usr/bin/ && chmod +x /usr/bin/{oc,kubectl} && rm -f README.md openshift-client-linux.tar.gz
 
-
 #COPY --from=build /src/out/* /usr/bin/
 COPY  bin/* /usr/bin/
 

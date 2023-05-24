@@ -1,7 +1,7 @@
 FROM quay.io/nmstate/c8s-nmstate-dev:v2.2.9
 
 RUN dnf update -y && \
-    dnf -y copr enable nmstate/nmstate-git && dnf install -y nmstate
+    dnf -y copr enable nmstate/nmstate-git && dnf install -y nmstate vim nc
 
 #RUN dnf update -y && dnf install -y nmstate
 
