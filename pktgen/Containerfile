@@ -1,0 +1,31 @@
+FROM quay.io/centos/centos:stream9
+
+RUN dnf install dnf-plugins-core -y && dnf config-manager --set-enabled crb && \
+  dnf install -y wget python3-pip gcc libpcap-devel numactl-libs numactl-devel lua-devel \
+  ninja-build libibverbs-utils libibverbs libconfig-devel rdma-core-devel python3-pyelftools meson && dnf clean all
+#RUN python3 -m pip install --user pyelftools # avoid requiring EPEL
+
+ARG DPDK_VERSION=22.07
+RUN cd /opt/ && \
+ wget http://fast.dpdk.org/rel/dpdk-${DPDK_VERSION}.tar.gz && \
+ tar -xpvf dpdk-${DPDK_VERSION}.tar.gz && rm dpdk-${DPDK_VERSION}.tar.gz && \
+ cd dpdk-${DPDK_VERSION} && meson build && meson configure -Dibverbs_link=static -Denable_docs=false -Dbuildtype=debug && \
+ ninja -C build install
+
+ARG PKTGEN_VER=22.07.1
+RUN cd /opt/ && \
+ wget -q https://github.com/pktgen/Pktgen-DPDK/archive/refs/tags/pktgen-$PKTGEN_VER.tar.gz && \
+ tar xaf pktgen-$PKTGEN_VER.tar.gz && rm pktgen-$PKTGEN_VER.tar.gz && \
+ cd Pktgen-DPDK-pktgen-${PKTGEN_VER}  && meson build && meson configure -Denable_lua=true && ninja -C build install
+
+RUN cd / && echo "/usr/local/lib64" > /etc/ld.so.conf.d/dpdk.conf && ldconfig
+
+RUN mv /opt/dpdk-${DPDK_VERSION} /opt/dpdk
+RUN mv /opt/Pktgen-DPDK-pktgen-${PKTGEN_VER} /opt/pktgen
+RUN dnf install -y tmux jq ethtool pciutils which iproute kmod && dnf clean all
+
+COPY start-pktgen.sh /opt/
+COPY pktgen.pkt /opt/
+COPY black-yellow.theme /opt/
+WORKDIR /opt/
+CMD exec /bin/bash -c "trap : TERM INT; sleep infinity & wait"
