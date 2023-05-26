@@ -3,11 +3,10 @@ set -euo pipefail
 
 #TODO: arg to define with cache-miss or not
 # podman run --privileged --env-file=/home/core/envs -v /tmp:/tmp -v /:/host --user=root --net=host --pid=host -it --rm quay.io/karampok/snife:latest dpdk-prof.sh
-#LEFTMAC="{LEFTMAC-:-'12:20:04:2e:6d:20'}"
-#RIGHTMAC="{RIGHTMAC-:-'12:20:04:2e:6d:21'}"
+LEFTMAC=${LEFTMAC:-""}
+RIGHTMAC=${RIGHTMAC:-""}
 PROCESS=${PROCESS:-"dpdk-testpmd"}
-PID=$(pgrep -f "$PROCESS")
-
+PID=${PID:-"$(pgrep -f "$PROCESS")"}
 INTERVAL=${INTERVAL:-"10"}
 
 #                    ┌─────────────────────────────────┐
@@ -220,11 +219,11 @@ echo "$TS,\$LRX,\$RRX,\$LTX,\$RTX,$folder" >> /$folder/../results.csv
 EOT
 chmod +x run-stats.sh
 
-./run-stats.sh | tee results
+[[ "${LEFTMAC}" != "" ]] && ./run-stats.sh | tee results
+[[ "${FTRACE:-""}" != "" ]] && ./run-ftrace.sh
 #./run-perf.sh
 #./run-pcm.sh
 #./run-event-trace.sh || true
-[[ "${FTRACE:-""}" != "" ]] && ./run-ftrace.sh
 
 echo tar -czvf "${folder##*/}".tar.gz -C "$folder" .
 
