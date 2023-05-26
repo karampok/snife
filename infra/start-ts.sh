@@ -3,7 +3,7 @@ set -euo pipefail
 
 echo 'Starting up tailscale...'
 
-tailscaled  &
+tailscaled 1>/tmp/tsed.logs 2>&1  &
 sleep 5
 if [ ! -S /var/run/tailscale/tailscaled.sock ]; then
     echo "tailscaled.sock does not exist. exit!"
@@ -19,11 +19,12 @@ until tailscale up \
     --authkey="${TS_AUTH}" \
     --ssh --hostname="${HOST}" \
     --advertise-routes "$ROUTES" \
-    --advertise-tags "unsafe" 1>/tmp/ts.logs 2>&1 
+    --advertise-tags "tag:unsafe" 1>/tmp/tsup.logs 2>&1 
 do
     sleep 0.1
 done
 
 mutagen-agent install
+echo "mosh root@workstation -- tmux attach -t 0 -d"
 
 trap : TERM INT; sleep infinity & wait

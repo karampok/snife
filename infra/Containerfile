@@ -26,10 +26,10 @@ COPY --from=build /app/tailscale /usr/bin/
 COPY --from=build /app/tailscaled /usr/bin/
 COPY start-ts.sh /usr/bin/
 COPY mutagen-agent /usr/bin/
-RUN mkdir -p /isos
+RUN mkdir -p /isos /workspace
 
-RUN printf 'mosh root@workstation -- tmux attach -t 0 -d\n' >> /etc/motd
 RUN printf 'python3 -m http.server 9000 -d /isos\n' >> /etc/motd
+RUN printf 'mutagen sync create --name=hostname (pwd) root@hostname:/workspace -i bin\n' >> /etc/motd
 
 USER root
 ENTRYPOINT ["/usr/bin/tini", "--"]
