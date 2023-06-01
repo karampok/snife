@@ -12,8 +12,8 @@ FROM fedora:38 as runtime
 LABEL description="Run container"
 
 RUN dnf install -y numactl strace ipcalc iptables file bind-utils tcpdump nmap-ncat iputils iproute \ 
-  pip openssl coreos-installer dnf-plugin-config-manager tmux dhcp-client openssh-clients wget nmstate procps-ng hwloc-gui hwloc \ 
-  tini tree libvirt-devel tree mosh gcc python3-devel git mosh stress bridge-utils conntrack-tools vim htop jq xz && dnf clean all
+  podman pip openssl coreos-installer dnf-plugin-config-manager tmux dhcp-client openssh-clients wget nmstate procps-ng hwloc-gui hwloc \ 
+  hostname tini tree libvirt-devel tree mosh gcc python3-devel git mosh stress bridge-utils conntrack-tools vim htop jq xz && dnf clean all
 
 RUN setcap 'cap_net_raw+ep' /usr/sbin/tcpdump
 #RUN curl https://raw.githubusercontent.com/karmab/kcli/main/install.sh | sudo bash
@@ -21,6 +21,10 @@ RUN setcap 'cap_net_raw+ep' /usr/sbin/tcpdump
 RUN cd /tmp \ 
   && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.12/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && tar xvfz openshift-client-linux.tar.gz \
   && mv oc kubectl /usr/bin/ && chmod +x /usr/bin/{oc,kubectl} && rm -f README.md openshift-client-linux.tar.gz
+
+RUN cd /tmp \ 
+  && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.12/openshift-install-linux.tar.gz -o openshift-install-linux.tar.gz && tar xvfz openshift-install-linux.tar.gz \
+  && mv openshift-install /usr/bin/ && chmod +x /usr/bin/openshift-install && rm -f README.md openshift-install-linux.tar.gz
 
 COPY --from=build /app/tailscale /usr/bin/
 COPY --from=build /app/tailscaled /usr/bin/
