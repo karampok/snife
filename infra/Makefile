@@ -2,9 +2,9 @@ NAME = quay.io/karampok/infra
 VERSION = latest
 
 build: stop
-	podman build --rm  -t $(NAME):$(VERSION) .
+	podman build --rm -t $(NAME):$(VERSION) .
 
-push: 
+push: build
 	podman push $(NAME):$(VERSION)
 
 stop:
@@ -16,4 +16,3 @@ run:
 	podman exec -it tinfra /bin/bash
 
 #mutagen sync create --name=infra-worspace (pwd) root@100.78.229.100:/workdir -i=openshift-install --ignore-vcs
-

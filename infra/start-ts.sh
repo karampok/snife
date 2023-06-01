@@ -3,7 +3,8 @@ set -euo pipefail
 
 echo "WORKDIR= $(pwd)"
 FILE=.ts-auth
-if test -f "$FILE"; then
+
+tsup (){
   echo 'tsed...'
 
   tailscaled 1>/tmp/tsed.logs 2>&1 &
@@ -13,9 +14,8 @@ if test -f "$FILE"; then
       exit 1
   fi
 
-  ROUTES=$(ip route list proto kernel | cut -d " " -f1 |tr '\n' ','| sed -e 's/,$/\n/')
   HOST=$(cat /proc/sys/kernel/hostname)
-
+  ROUTES=${ROUTES:-$(ip route list proto kernel | cut -d " " -f1 |tr '\n' ','| sed -e 's/,$/\n/')}
   #TODO: ipv6
 
   until tailscale up \
@@ -26,11 +26,23 @@ if test -f "$FILE"; then
   do
       sleep 0.1
   done
+  echo "tailscale up --hostname=${HOST} --ssh --advertise-routes $ROUTES"
   echo "mosh root@${HOST} -- tmux attach -t 0 -d"
   echo "mutagen sync create --name=${HOST} (pwd) root@${HOST}:/workdir -i=bin --ignore-vcs"
-  echo "--advertise-routes $ROUTES"
-fi
+}
 
 mutagen-agent install
+
+if test -f "$FILE"; then
+  tsup
+else
+  while read -r f
+  do
+    if [ "$f" = "${FILE}" ]
+    then
+      tsup
+    fi
+  done < <(inotifywait -m -q -e create --format %f ./)
+fi
 
 trap : TERM INT; sleep infinity & wait
