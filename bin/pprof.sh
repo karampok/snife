@@ -2,7 +2,7 @@
 set -euo pipefail
 
 #TODO: arg to define with cache-miss or not
-# podman run --privileged --env-file=/home/core/envs -v /tmp:/tmp -v /:/host --user=root --net=host --pid=host -it --rm quay.io/karampok/snife:latest dpdk-prof.sh
+# podman run --privileged --cpuset-cpus=0  --env-file=/home/core/envs -v /tmp:/tmp -v /:/host --user=root --net=host --pid=host -it --rm quay.io/karampok/snife:latest dpdk-prof.sh
 LEFTMAC=${LEFTMAC:-""}
 RIGHTMAC=${RIGHTMAC:-""}
 PROCESS=${PROCESS:-"dpdk-testpmd"}
@@ -76,14 +76,16 @@ ps  -o uname,pid,ppid,cmd,cls,psr --deselect &>"$folder"/ps-o_unmae,pid,ppid,cmd
 pstree -p "$PID" &>"$folder"/pstree-p-process
 
 #https://github.com/openshift-kni/debug-tools
+knit cpuaff -P /host/proc >"$folder"/knit_cpuaff_c
 knit cpuaff -P /host/proc -C "$cpus" >"$folder"/knit_cpuaff_c
-knit irqaff -P /host/proc -C "$cpus" >"$folder"/knit_irqaff_c
 knit irqaff -P /host/proc  >"$folder"/knit_irqaff
+knit irqaff -P /host/proc -C "$cpus" >"$folder"/knit_irqaff_c
 knit irqaff -P /host/proc -s -C "$cpus" >"$folder"/knit_irqaff_s_c
 
 cat /host/proc/iomem &>"$folder"/proc_iomem
 cat /host/proc/sched_debug &>"$folder"/proc_sched_debug
 cat /host/proc/cmdline &>"$folder"/proc_cmdline
+lscpu &>"$folder"/lscpu
 top -b -n 2 -H -p "$PID" &>"$folder"/top-b-n2-H-p-process
 knit irqwatch -P /host/proc -C "$cpus" -J -T 10 |jq . > "$folder"/knit_irqwatch_C_t10.json
 sysctl -A >"$folder"/sysctl-A

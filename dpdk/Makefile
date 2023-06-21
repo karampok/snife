@@ -1,8 +1,8 @@
 NAME = quay.io/karampok/dpdk
-VERSION = 21.11.1
+VERSION = latest
 
 build:
-	podman build --rm --build-arg DPDK_VERSION=$(VERSION) -t $(NAME):$(VERSION) .
+	podman build --authfile=/home/kka/.pull-secret.json --rm --build-arg FROMTAG=$(VERSION) -t $(NAME):$(VERSION) .
 
 push: build
 	podman push $(NAME):$(VERSION)

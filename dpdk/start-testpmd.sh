@@ -31,7 +31,6 @@ for i in "${ACPUS[@]}"; do
 done
 CPUS="${CPUS:1}"
 
-
 X=$(grep k8s.v1.cni.cncf.io/network-status /etc/podnetinfo/annotations| awk -F= '{print $2}')
 X=$(echo -e "$X")
 X="${X//\\/}"

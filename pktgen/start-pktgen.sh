@@ -2,7 +2,7 @@
 set -euo pipefail
 
 CPUMASK=$(grep Cpus_allowed: /proc/1/status | sed s/,//g | grep -o "[0-9,a-f]*$")
-LASTCPU=$(grep processor /proc/cpuinfo  | tail -1 | grep -o "[0-9]*$")
+LASTCPU=$(grep processor /proc/cpuinfo | tail -1 | grep -o "[0-9]*$")
 
 I=0
 ACPUS=()
@@ -46,4 +46,4 @@ M=$(echo "$CPUS" | awk -F, '{ print $1".0,"$2".1" }')
 
 # https://pktgen-dpdk.readthedocs.io/en/latest/usage_pktgen.html
 echo pktgen -vvv -l "$MASTER,$CPUS" -a "$LEFT" -a "$RIGHT" -n "${CHANNELS:-4}" \
-  -- -P -m \""$M"\"  -l /tmp/pktgen.log -T -f /opt/pktgen.pkt -f /opt/black-yellow.theme
+  -- -P -m \""$M"\" -l /tmp/pktgen.log -T -f /opt/black-yellow.theme -f /opt/pktgen.pkt
