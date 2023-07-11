@@ -24,12 +24,13 @@ RUN cd / && echo "/usr/local/lib64" > /etc/ld.so.conf.d/dpdk.conf && ldconfig
 
 RUN mv /opt/dpdk-${DPDK_VERSION} /opt/dpdk
 RUN mv /opt/Pktgen-DPDK-pktgen-${PKTGEN_VER} /opt/pktgen
-RUN cp /opt/pktgen/scripts/rfc2544.lua /opt/
 RUN dnf install -y tmux socat jq ethtool pciutils which iproute kmod && dnf clean all
 
 COPY start-pktgen.sh /opt/
-COPY pktgen.pkt /opt/
 COPY *.lua /opt/
+#RUN cp /opt/pktgen/Pktgen.lua /opt/
+COPY scripts /opt/scripts
 COPY black-yellow.theme /opt/
+
 WORKDIR /opt/
 CMD exec /bin/bash -c "trap : TERM INT; sleep infinity & wait"

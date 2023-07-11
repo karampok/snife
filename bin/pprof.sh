@@ -6,7 +6,7 @@ set -euo pipefail
 LEFTMAC=${LEFTMAC:-""}
 RIGHTMAC=${RIGHTMAC:-""}
 PROCESS=${PROCESS:-"dpdk-testpmd"}
-PID=${PID:-"$(pgrep -f "$PROCESS")"}
+PID=${PID:-"$(pidof "$PROCESS")"}
 INTERVAL=${INTERVAL:-"10"}
 
 #                    ┌─────────────────────────────────┐

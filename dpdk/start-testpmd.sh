@@ -43,6 +43,16 @@ RIGHT=$(echo "$NETINFO" | jq -r '.[] | select(.interface=="net2")."device-info".
 NBCORES=${NBCORES:-$NUM}
 : "${CHANNELS:-4}"
 
+ARGS=${ARGS:-"--cmdline-file=/opt/args.txt"}
+echo "set promisc all off" > /opt/args.txt
+
+if [ "${1:-exec}" = "noexec" ]; then
+  echo dpdk-testpmd -l "$MASTER,$CPUS" -a "$LEFT" -a "$RIGHT" -n "$CHANNELS" \
+    -- --nb-cores="$NUM" --forward-mode=mac --rxd=2048 --txd=2048  \
+    --eth-peer=0,"$LEFT_MAC" --eth-peer=1,"$RIGHT_MAC" "$ARGS" -i > /opt/start-testpmd
+  trap : TERM INT; sleep infinity & wait
+fi
+
 exec dpdk-testpmd -l "$MASTER,$CPUS" -a "$LEFT" -a "$RIGHT" -n "$CHANNELS" \
   -- --nb-cores="$NUM" --forward-mode=mac --rxd=2048 --txd=2048  \
-  --eth-peer=0,"$LEFT_MAC" --eth-peer=1,"$RIGHT_MAC" --auto-start --stats-period 10
+  --eth-peer=0,"$LEFT_MAC" --eth-peer=1,"$RIGHT_MAC" "$ARGS" --auto-start --stats-period 10

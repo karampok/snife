@@ -13,30 +13,34 @@ LABEL description="Run container"
 
 RUN dnf install -y numactl strace ipcalc iptables file bind-utils tcpdump nmap-ncat iputils iproute \ 
   podman pip openssl coreos-installer dnf-plugin-config-manager tmux dhcp-client openssh-clients wget nmstate procps-ng hwloc-gui hwloc \ 
-  inotify-tools hostname tini tree libvirt-devel tree mosh gcc python3-devel git mosh stress bridge-utils conntrack-tools vim htop jq xz && dnf clean all
+  wireguard-tools inotify-tools hostname tini tree libvirt-devel tree mosh gcc python3-devel git mosh stress bridge-utils conntrack-tools vim htop jq xz && dnf clean all
 
 RUN setcap 'cap_net_raw+ep' /usr/sbin/tcpdump
 #RUN curl https://raw.githubusercontent.com/karmab/kcli/main/install.sh | sudo bash
 
 RUN cd /tmp \ 
-  && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.12/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && tar xvfz openshift-client-linux.tar.gz \
+  && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.13/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && tar xvfz openshift-client-linux.tar.gz \
   && mv oc kubectl /usr/bin/ && chmod +x /usr/bin/{oc,kubectl} && rm -f README.md openshift-client-linux.tar.gz
 
 RUN cd /tmp \ 
-  && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.12/openshift-install-linux.tar.gz -o openshift-install-linux.tar.gz && tar xvfz openshift-install-linux.tar.gz \
+  && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.13/openshift-install-linux.tar.gz -o openshift-install-linux.tar.gz && tar xvfz openshift-install-linux.tar.gz \
   && mv openshift-install /usr/bin/ && chmod +x /usr/bin/openshift-install && rm -f README.md openshift-install-linux.tar.gz
 
 COPY --from=build /app/tailscale /usr/bin/
 COPY --from=build /app/tailscaled /usr/bin/
-COPY start-ts.sh /usr/bin/
-COPY mutagen-agent /usr/bin/
+COPY bin/* /usr/bin/
 RUN mkdir -p /isos /workspace
 
 RUN printf 'python3 -m http.server 9000 -d /isos\n' >> /etc/motd
 RUN printf 'mutagen sync create --name=hostname (pwd) root@hostname:/workspace -i bin\n' >> /etc/motd
 
 USER root
+
+# Expose the WireGuard port
+EXPOSE 51820/udp
+
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["start-ts.sh"]
+#CMD ["wg-quick", "up", "$WG_INTERFACE_NAME"]
 #https://tailscale.com/kb/1111/ephemeral-nodes/
 #https://gist.github.com/hamishforbes/2ac7ae9d7ea47cad4e3a813c9b45c10f

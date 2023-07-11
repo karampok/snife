@@ -45,5 +45,5 @@ NBCORES=${NBCORES:-$NUM}
 M=$(echo "$CPUS" | awk -F, '{ print $1".0,"$2".1" }')
 
 # https://pktgen-dpdk.readthedocs.io/en/latest/usage_pktgen.html
-echo pktgen -vvv -l "$MASTER,$CPUS" -a "$LEFT" -a "$RIGHT" -n "${CHANNELS:-4}" \
+echo tmux new-session pktgen -vvv -l "$MASTER,$CPUS" -a "$LEFT" -a "$RIGHT" -n "${CHANNELS:-4}" \
   -- -P -m \""$M"\" -l /tmp/pktgen.log -T -f /opt/black-yellow.theme -f /opt/pktgen.pkt
