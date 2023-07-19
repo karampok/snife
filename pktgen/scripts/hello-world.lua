@@ -24,4 +24,4 @@ function Info()
 		pktgen.totalPorts());
 end
 
-info()
+Info()

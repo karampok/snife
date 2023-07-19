@@ -44,6 +44,15 @@ RIGHT=$(echo "$NETINFO" | jq -r '.[] | select(.interface=="net2")."device-info".
 NBCORES=${NBCORES:-$NUM}
 M=$(echo "$CPUS" | awk -F, '{ print $1".0,"$2".1" }')
 
-# https://pktgen-dpdk.readthedocs.io/en/latest/usage_pktgen.html
-echo tmux new-session pktgen -vvv -l "$MASTER,$CPUS" -a "$LEFT" -a "$RIGHT" -n "${CHANNELS:-4}" \
-  -- -P -m \""$M"\" -l /tmp/pktgen.log -T -f /opt/black-yellow.theme -f /opt/pktgen.pkt
+sleep 15 
+ARGS=${ARGS:-"-G"}
+
+if [ "${1:-exec}" = "noexec" ]; then
+   echo tmux new-session pktgen -vvv -l "$MASTER,$CPUS" -a "$LEFT" -a "$RIGHT" -n "${CHANNELS:-4}" \
+     -- -P -m \""$M"\" -l /tmp/pktgen.log -T -f /opt/black-yellow.theme "$ARGS" > /opt/start-me
+   trap : TERM INT; sleep infinity & wait
+fi
+
+# this path is not working
+tmux new-session pktgen -vvv -l "$MASTER,$CPUS" -a "$LEFT" -a "$RIGHT" -n "${CHANNELS:-4}" \
+     -- -P -m \""$M"\" -l /tmp/pktgen.log -T -f /opt/black-yellow.theme "$ARGS"

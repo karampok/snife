@@ -86,4 +86,4 @@ function Main(input)
   end
 end
 
-Main(...);
+Main(... or {});
