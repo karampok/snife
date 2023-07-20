@@ -24,7 +24,7 @@ RUN cd / && echo "/usr/local/lib64" > /etc/ld.so.conf.d/dpdk.conf && ldconfig
 
 RUN mv /opt/dpdk-${DPDK_VERSION} /opt/dpdk
 RUN mv /opt/Pktgen-DPDK-pktgen-${PKTGEN_VER} /opt/pktgen
-RUN dnf install -y tmux socat jq ethtool pciutils which iproute kmod && dnf clean all
+RUN dnf install -y tmux procps socat jq ethtool pciutils which iproute kmod && dnf clean all
 
 COPY start-pktgen.sh /opt/
 COPY *.lua /opt/
