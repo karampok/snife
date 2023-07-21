@@ -26,9 +26,9 @@ tsup (){
   do
       sleep 0.1
   done
-  echo "tailscale up --hostname=${HOST} --ssh --advertise-routes $ROUTES"
-  echo "mosh root@${HOST} -- tmux attach -t 0 -d"
-  echo "mutagen sync create --name=${HOST} (pwd) root@${HOST}:/workdir -i=bin --ignore-vcs"
+#  echo "tailscale up --hostname=${HOST} --ssh --advertise-routes $ROUTES"
+#  echo "mosh root@${HOST} -- tmux attach -t 0 -d"
+#  echo "mutagen sync create --name=${HOST} (pwd) root@${HOST}:/workdir -i=bin --ignore-vcs"
 }
 
 mutagen-agent install
@@ -46,4 +46,9 @@ else
   done < <(inotifywait -m -q -e create --format %f ./)
 fi
 
-trap : TERM INT; sleep infinity & wait
+cleanup() {
+    echo "Cleaning stuff up..."
+    tailscale down
+    exit
+}
+trap cleanup TERM INT; sleep infinity & wait
