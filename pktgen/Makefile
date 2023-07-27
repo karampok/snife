@@ -1,14 +1,16 @@
 NAME = quay.io/karampok/pktgen
-VERSION = latest
+TAG = 22.07
+DPDK_VERSION = 22.07
+PKTGEN_VERSION = 22.07.1
 
 build:
-	podman build --rm  -t $(NAME):$(VERSION) .
+	podman build --rm --build-arg PKTGEN_VERSION=$(PKTGEN_VERSION) --build-arg DPDK_VERSION=$(DPDK_VERSION) -t $(NAME):$(TAG) .
 
 push: build
-	podman push $(NAME):$(VERSION)
+	podman push $(NAME):$(TAG)
 
 run:
-	podman run --rm -it --cap-add SYS_PTRACE  $(NAME):$(VERSION) /bin/bash
+	podman run --rm -it --cap-add SYS_PTRACE $(NAME):$(VERSION) /bin/bash
 
 try:
 	oc port-forward pktgen 22022 &

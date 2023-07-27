@@ -64,7 +64,7 @@ function trim(txt) return gsub(txt, "%s*(.-)%s*$", "%1", 1); end
 -- ===========================================================================
 -- A formatted output routine just like the real printf.
 --
-function Printf(...) io.write(strfmt(...)); io.flush(); end
+function printf(...) io.write(strfmt(...)); io.flush(); end
 
 -- ===========================================================================
 -- returns the table size or number of items in table.
@@ -157,7 +157,7 @@ end
 --
 function errmsg(m, ...)
 
-    if ( m ~= nil ) then Printf("** %s", strfmt(m, ...)); end
+    if ( m ~= nil ) then printf("** %s", strfmt(m, ...)); end
 
     os.exit(1);
 end
@@ -167,16 +167,16 @@ end
 --
 function cPrintf(m, ...)
 
-    Printf("/* ");
+    printf("/* ");
     io.write(strfmt(m, ...));
-    Printf(" */\n");
+    printf(" */\n");
 end
 -- ===========================================================================
 -- Output a 'C' like comment.
 --
 function comment(msg)
 
-    Printf("/* %s */\n", msg or "ooops");
+    printf("/* %s */\n", msg or "ooops");
 end
 
 -- Standard set of functions for normal operation.

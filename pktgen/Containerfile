@@ -7,29 +7,30 @@ RUN dnf install dnf-plugins-core -y && dnf config-manager --set-enabled crb && \
   ninja-build libibverbs-utils libibverbs libconfig-devel rdma-core-devel python3-pyelftools meson && dnf clean all
 #RUN python3 -m pip install --user pyelftools # avoid requiring EPEL
 
-ARG DPDK_VERSION=22.07
+ARG DPDK_VERSION
+ENV DPDK_VERSION ${DPDK_VERSION}
+
 RUN cd /opt/ && \
  wget http://fast.dpdk.org/rel/dpdk-${DPDK_VERSION}.tar.gz && \
  tar -xpvf dpdk-${DPDK_VERSION}.tar.gz && rm dpdk-${DPDK_VERSION}.tar.gz && \
  cd dpdk-${DPDK_VERSION} && meson -Dexamples=all build && meson configure -Dibverbs_link=static -Denable_docs=false -Dbuildtype=debug && \
  ninja -C build install
 
-ARG PKTGEN_VER=22.07.1
+ARG PKTGEN_VERSION
+ENV PKTGEN_VERSION ${PKTGEN_VERSION}
 RUN cd /opt/ && \
- wget -q https://github.com/pktgen/Pktgen-DPDK/archive/refs/tags/pktgen-$PKTGEN_VER.tar.gz && \
- tar xaf pktgen-$PKTGEN_VER.tar.gz && rm pktgen-$PKTGEN_VER.tar.gz && \
- cd Pktgen-DPDK-pktgen-${PKTGEN_VER} && make buildlua  && PKTGEN_DESTDIR=/ make install
+ wget -q https://github.com/pktgen/Pktgen-DPDK/archive/refs/tags/pktgen-$PKTGEN_VERSION.tar.gz && \
+ tar xaf pktgen-$PKTGEN_VERSION.tar.gz && rm pktgen-$PKTGEN_VERSION.tar.gz && \
+ cd Pktgen-DPDK-pktgen-${PKTGEN_VERSION} && make buildlua && PKTGEN_DESTDIR=/ make install
 
 RUN cd / && echo "/usr/local/lib64" > /etc/ld.so.conf.d/dpdk.conf && ldconfig
 
-RUN mv /opt/dpdk-${DPDK_VERSION} /opt/dpdk
-RUN mv /opt/Pktgen-DPDK-pktgen-${PKTGEN_VER} /opt/pktgen
+RUN mv /opt/dpdk-${DPDK_VERSION} /usr/src/dpdk &&  mv /opt/Pktgen-DPDK-pktgen-${PKTGEN_VERSION} /usr/src/pktgen
 RUN dnf install -y tmux procps socat jq ethtool pciutils which iproute kmod && dnf clean all
 
 COPY start-pktgen.sh /opt/
-COPY *.lua /opt/
-#RUN cp /opt/pktgen/Pktgen.lua /opt/
-COPY scripts /opt/scripts
+COPY lua /opt/lua
+COPY Pktgen.lua /opt/
 COPY black-yellow.theme /opt/
 
 WORKDIR /opt/
