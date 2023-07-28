@@ -48,7 +48,7 @@ ARGS=${ARGS:-""}
 
 
 echo pktgen -vvv -l "$MASTER,$CPUS" -a "$LEFT" -a "$RIGHT" -n "${CHANNELS:-4}" \
-     -- -P -m \""$M"\" -l /tmp/pktgen.log -T -f /opt/black-yellow.theme -G "$ARGS" > /opt/startme
+     -- -P -m \""$M"\" -l /tmp/pktgen.log -v -N -f /opt/black-yellow.theme -G "$ARGS" > /opt/startme
 chmod +x /opt/startme
 
 if [ "${1:-exec}" = "noexec" ]; then
