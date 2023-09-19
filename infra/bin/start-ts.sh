@@ -1,7 +1,6 @@
 ##! /bin/bash
 set -euo pipefail
 
-echo "WORKDIR= $(pwd)"
 FILE=.ts-auth
 
 tsup (){
@@ -26,13 +25,20 @@ tsup (){
   do
       sleep 0.1
   done
-#  echo "tailscale up --hostname=${HOST} --ssh --advertise-routes $ROUTES"
-#  echo "mosh root@${HOST} -- tmux attach -t 0 -d"
-#  echo "mutagen sync create --name=${HOST} (pwd) root@${HOST}:/workdir -i=bin --ignore-vcs"
+  echo "# tailscale up --hostname=${HOST} --ssh --advertise-routes $ROUTES"
+  echo "tailscale ssh root@${HOST}"
+  echo "mosh root@${HOST} -- tmux attach -t 0 -d"
+  echo "mutagen sync create --name=${HOST} (pwd) root@${HOST}:/workdir -i=bin --ignore-vcs"
+  rm $FILE
 }
 
 mutagen-agent install
-setup-wg.sh
+setup-wg.sh || true
+setup-gitlabci.sh &
+
+python3 -m http.server 9000 -d /share 1>/tmp/http.log 2>&1  &
+sed -i 's/#PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+ssh-keygen -A && /usr/sbin/sshd -D -p 2022 1>/tmp/sshd.log 2>&1 &
 
 if test -f "$FILE"; then
   tsup
