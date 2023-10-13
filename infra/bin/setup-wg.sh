@@ -61,3 +61,6 @@ mutagen sync create --name=hostname (pwd) root@10.0.0.1:/workspace
 mosh --ssh=\"ssh -p 2022\" root@10.0.0.1
 ###################################################
 " | tee /tmp/wgup
+
+
+add-wg-user.sh
