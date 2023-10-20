@@ -1,0 +1,32 @@
+---
+interfaces:
+  - name: bond0.10
+    type: vlan
+    state: up
+    vlan:
+      base-iface: bond0
+      id: 10
+    ipv4:
+      enabled: true
+      dhcp: true
+    ipv6:
+      enabled: true
+      autoconf: true
+      dhcp: true
+      auto-dns: false
+      auto-gateway: true
+      auto-routes: true
+  - name: bond0.11
+    type: vlan
+    state: up
+    vlan:
+      base-iface: bond0
+      id: 11
+    ipv4:
+      enabled: true
+      address:
+        - ip: 11.11.11.200
+          prefix-length: 24
+      dhcp: false
+    ipv6:
+      enabled: false

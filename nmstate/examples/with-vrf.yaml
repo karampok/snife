@@ -1,0 +1,16 @@
+---
+interfaces:
+  - name: green
+    type: vrf
+    state: up
+    vrf:
+      port:
+        - bond0.11
+      route-table-id: 100
+routes:
+  config:
+    - destination: 203.100.100.0/24
+      metric: 400
+      next-hop-interface: bond0.11
+      next-hop-address: 11.11.11.254
+      table-id: 100

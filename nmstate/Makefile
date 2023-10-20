@@ -1,5 +1,6 @@
 NAME = quay.io/karampok/nmstate
 VERSION = latest
+# https://gist.github.com/karampok/0df94853eaf20030f712d39ac64c658a
 
 build: 
 	podman build --rm  -t $(NAME):$(VERSION) .

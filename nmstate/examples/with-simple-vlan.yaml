@@ -1,0 +1,26 @@
+---
+interfaces:
+  - name: eth0
+    type: ethernet
+    state: up
+    ipv4:
+      enabled: false
+      dhcp: false
+    ipv6:
+      enabled: false
+      autoconf: false
+  - name: eth0.10
+    type: vlan
+    state: up
+    vlan:
+      base-iface: eth0
+      id: 10
+    ipv4:
+      enabled: true
+      dhcp: false
+      address:
+        - ip: 192.168.200.100
+          prefix-length: 24
+    ipv6:
+      enabled: false
+      autoconf: false
