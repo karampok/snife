@@ -1,8 +1,3 @@
-#FROM quay.io/centos/centos:stream8 AS CP
-#RUN dnf install -y tmux
-#COPY --from=CP /usr/bin/tmux /usr/bin/
-
-# ARG DPDK_VERSION=22.07.0
 ARG FROMTAG ${FROMTAG}
 FROM registry.redhat.io/openshift4/dpdk-base-rhel8:${FROMTAG}
 #https://catalog.redhat.com/software/containers/openshift4/dpdk-base-rhel8/5e32be6cdd19c77896004a41?container-tabs=overview

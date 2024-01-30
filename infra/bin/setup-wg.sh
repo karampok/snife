@@ -46,7 +46,7 @@ cat <<EOF > /tmp/lab.conf
 [Interface]
 PrivateKey = $peer_privkey
 Address = 10.0.0.2/24
-PostUp =resolvectl dns %i 10.10.20.10; sudo resolvectl domain %i eric.vlab
+PostUp =resolvectl dns %i 10.10.20.10; sudo resolvectl domain %i ~eric.vlab
 
 [Peer]
 PublicKey = $server_pubkey

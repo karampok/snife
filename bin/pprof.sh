@@ -90,6 +90,11 @@ top -b -n 2 -H -p "$PID" &>"$folder"/top-b-n2-H-p-process
 knit irqwatch -P /host/proc -C "$cpus" -J -T 10 |jq . > "$folder"/knit_irqwatch_C_t10.json
 sysctl -A >"$folder"/sysctl-A
 
+tar -czvf "$folder"/cpu_info.tar.gz /sys/devices/system/cpu/ || true
+# cd /sys/devices/system/cpu/cpu0/cpufreq/
+# $ paste <(ls *) <(cat *) | column -s $'\t' -t
+#oc debug node/x -- bash -c 'tar --ignore-failed-read  -czf - /sys/devices/system/cpu/ 2>/dev/null' > x.tar.gz
+
 cat <<EOT > run-pcm.sh
 #! /bin/bash
 set -euo pipefail
@@ -259,3 +264,24 @@ echo tar -czvf "${folder##*/}".tar.gz -C "$folder" .
 #TODO:// perf record -C 0 -z -e cache-misses -- check the file
 # echo "for f in bad-prof/perf/*;do nvim -d {good,bad}-prof/perf/${f##*/};read -n 1 ;done"
 # perf stat -C "$cpus" -A -a -e irq_vectors:* -e timer:*  sleep 10 2>&1 > perf/perf_stat
+#
+
+
+# Notes
+# isolcpus=list of critical cores – isolate the critical cores so that the
+# kernel scheduler will not migrate tasks from other cores into them
+# irqaffinity=list of non-critical cores – protect the critical cores from IRQs.
+# rcu_nocbs=list of critical cores – stop RCU callbacks from getting called
+# into the critical cores.
+# nohz=off – The kernel's “dynamic ticks” mode of managing scheduling-clock ticks
+# is known to impact latencies while exiting CPU idle states. This option turns
+# that mode off. 
+# nohz_full=list of critical cores – this will activate dynamic ticks mode of
+# managing scheduling-clock ticks. The cores in the list will not get
+# scheduling-clock ticks if there is only a single task running or if the core is
+# idle. 
+
+#WP feature
+# pgrep "systemd|crio|kubelet" | while read i; do echo "CPUSet $(taskset -cp $i | grep -Po '[0-9]+[-,]+[0-9]+.*') for process $(ps -p $i -o comm=)"; done
+# pgrep "ovn|apiserver" | while read i; do echo "CPUSet $(taskset -cp $i | grep -Po '[0-9]+[-,]+[0-9]+.*') for process $(ps -p $i -o comm=)"; done
+# cat /etc/crio/crio.conf.d/01-workload-partitioning

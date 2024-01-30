@@ -27,25 +27,40 @@ RUN cd /tmp \
     && chmod +x /usr/local/bin/yq
 
 RUN cd /tmp \
-    && wget -qO /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/download/v2.8.4/argocd-linux-amd64 \
-    && chmod +x /usr/local/bin/argocd
+    && curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64 \
+    && install -m 555 argocd-linux-amd64 /usr/local/bin/argocd \
+    && rm argocd-linux-amd64
+
+RUN cd /tmp \
+    && curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64 \
+    && install -m 555 argocd-linux-amd64 /usr/local/bin/argocd \
+    && rm argocd-linux-amd64
+
+RUN cd /tmp \
+    && curl -sSL -o gh_linux_amd64.tar.gz https://github.com/cli/cli/releases/download/v2.40.0/gh_2.40.0_linux_amd64.tar.gz \
+    && tar -xzf gh_linux_amd64.tar.gz \
+    && mv gh_*/bin/gh /usr/local/bin/gh \
+    && rm -rf gh_*
 
 RUN cd /tmp \
   && curl -L --output /usr/bin/gitlab-runner "https://gitlab-runner-downloads.s3.amazonaws.com/latest/binaries/gitlab-runner-linux-amd64" \
   && chmod +x /usr/bin/gitlab-runner
 
 RUN cd /tmp \
-  && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.13/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && tar xvfz openshift-client-linux.tar.gz \
+  && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.14/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && tar xvfz openshift-client-linux.tar.gz \
   && mv oc kubectl /usr/bin/ && chmod +x /usr/bin/{oc,kubectl} && rm -f README.md openshift-client-linux.tar.gz
 
 RUN cd /tmp \
-  && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.13/openshift-install-linux.tar.gz -o openshift-install-linux.tar.gz && tar xvfz openshift-install-linux.tar.gz \
+  && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.14/openshift-install-linux.tar.gz -o openshift-install-linux.tar.gz && tar xvfz openshift-install-linux.tar.gz \
   && mv openshift-install /usr/bin/ && chmod +x /usr/bin/openshift-install && rm -f README.md openshift-install-linux.tar.gz
 
 COPY --from=build /app/tailscale /usr/bin/
 COPY --from=build /app/tailscaled /usr/bin/
 COPY bin/* /usr/bin/
 RUN mkdir -p /share /workspace /iso
+RUN pip3 install pandas matplotlib
+ENV TERM xterm
+
 
 #RUN printf 'python3 -m http.server 9000 -d /share\n' >> /etc/motd
 RUN printf 'mutagen sync create --name=hostname (pwd) root@hostname:/workspace -i bin\n' >> /etc/motd
