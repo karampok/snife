@@ -1,8 +1,22 @@
 #! /bin/bash
 set -euo pipefail
 
-#TODO: arg to define with cache-miss or not
-# podman run --privileged --cpuset-cpus=0 --env-file=/home/core/envs -v /tmp:/tmp -v /:/host --user=root --net=host --pid=host -it --rm quay.io/karampok/snife:latest pprof.sh
+: <<'END_COMMENT'
+
+cat /home/core/envs
+LEFTMAC=10:00:00:00:00:10
+RIGHTMAC=20:00:00:00:00:11
+
+podman run --privileged --cpuset-cpus=0 --env-file=/home/core/envs \
+  -v /tmp:/tmp -v /:/host --user=root --net=host --pid=host -it --rm \
+  quay.io/karampok/snife:latest pprof.sh
+
+
+oc debug node/hpe183 --image quay.io/karampok/snife:latest -- /bin/bash -c \
+  'LEFTMAC=10:00:00:00:00:10 RIGHTMAC=20:00:00:00:00:11 pprof.sh'
+
+END_COMMENT
+
 LEFTMAC=${LEFTMAC:-""}
 RIGHTMAC=${RIGHTMAC:-""}
 PROCESS=${PROCESS:-"dpdk-testpmd"}
@@ -11,17 +25,8 @@ INTERVAL=${INTERVAL:-"10"}
 
 #                    ┌─────────────────────────────────┐
 #                    │                                 │
-#                    │                                 │
-#                    │                                 │
-#                    │                                 │
 #       leftmac      │           PROCESS-PMD           │   rightmac
 # ──────────────────►│                                 ├─────────────────►
-#                    │                                 │
-#                    │                                 │
-#                    │                                 │
-#                    │                                 │
-#                    │                                 │
-#                    │                                 │
 #                    │                                 │
 #                    └─────────────────────────────────┘
 
@@ -33,7 +38,7 @@ mkdir -p "$folder"/ethtool-{A,B} && cd "$folder"
 cp "$0" . || true
 
 # TODO// run inside or outside container
-#
+
 cdir=$(grep cpu,cpuacct /proc/"$PID"/cgroup | awk -F: '{print "/host/sys/fs/cgroup/cpu,cpuacct"$3}')
 f=$(grep cpuset /proc/"$PID"/cgroup|awk -F: '{print "/host/sys/fs/cgroup/cpuset"$3"/cpuset.cpus"}')
 cpus=$(cat "$f")
@@ -58,11 +63,11 @@ cd "$cdir";grep -rRH . &>"$folder"/cgroup-cpu-A ; cd - >/dev/null
 # TODO add ens under ENV
 # TODO ethtool folder to be given as var
 ip --json link| jq -r '.[] | select(.ifname | startswith("ens")).ifname' | xargs -i sh -c 'ethtool -S {} &> ethtool-A/s-{}'
-#echo "TIMESTAMP A - $(date +"%s")"
+echo "TIMESTAMP A - $(date +"%s")"
 ip -s -s --json link|jq '.[] | select(.ifname | startswith("ens"))' | jq -s '.' > ip_link_show_A.json
 sleep "$INTERVAL"
 ip -s -s --json link|jq '.[] | select(.ifname | startswith("ens"))' | jq -s '.' > ip_link_show_B.json
-#echo "TIMESTAMP B - $(date +"%s")"
+echo "TIMESTAMP B - $(date +"%s")"
 ip --json link| jq -r '.[] | select(.ifname | startswith("ens")).ifname' | xargs -i sh -c 'ethtool -S {} &> ethtool-B/s-{}'
 
 cd "$cdir";grep -rRH . &>"$folder"/cgroup-cpu-A ; cd - >/dev/null
@@ -90,7 +95,9 @@ top -b -n 2 -H -p "$PID" &>"$folder"/top-b-n2-H-p-process
 knit irqwatch -P /host/proc -C "$cpus" -J -T 10 |jq . > "$folder"/knit_irqwatch_C_t10.json
 sysctl -A >"$folder"/sysctl-A
 
-tar -czvf "$folder"/cpu_info.tar.gz /sys/devices/system/cpu/ || true
+tar -cf "$folder"/cpu_info.tar /sys/devices/system/cpu/ 2>/dev/null || true
+#tar -xf "$folder"/cpu_info.tar -C "$folder"
+
 # cd /sys/devices/system/cpu/cpu0/cpufreq/
 # $ paste <(ls *) <(cat *) | column -s $'\t' -t
 #oc debug node/x -- bash -c 'tar --ignore-failed-read  -czf - /sys/devices/system/cpu/ 2>/dev/null' > x.tar.gz
@@ -232,7 +239,10 @@ chmod +x run-stats.sh
 #./run-pcm.sh
 #./run-event-trace.sh || true
 
-echo tar -czvf "${folder##*/}".tar.gz -C "$folder" .
+echo tar -czvf /host/"$(dirname "${folder}")".tar.gz -C /tmp .
+tar -czf /host/"$(dirname "${folder}")".tar.gz -C /tmp .
+IP=$(ip -json route get 8.8.8.8 |jq -r .[0].prefsrc)
+echo "scp core@$IP:$(dirname "$folder").tar.gz /tmp"
 
 # TODO
 # hwlatdetect --threshold 5 --duration 600 --window 1000000 --width 950000
