@@ -1,1 +1,1 @@
-f = assert(loadfile("lua/simple.lua")); f({d=30000,r=98, t=3, p={0, 64, 128, 256, 512, 1024, 1280, 1518 }});
+f = assert(loadfile("lua/trial.lua")); f({d=30000,r=50, t=3, p={ 512 }});

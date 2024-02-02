@@ -4,3 +4,4 @@ FROM registry.redhat.io/openshift4/dpdk-base-rhel8:${FROMTAG}
 
 COPY start-testpmd.sh /usr/local/bin/
 COPY jq /usr/local/bin/
+WORKDIR /opt/
