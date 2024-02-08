@@ -62,7 +62,7 @@ function RunTrial(speed, size, rate, duration,loss_tol, times)
     pktgen.clr()
     pktgen.set("0", "rate", rate)
     pktgen.set("0", "size", size)
-    pktgen.set("0", "count", count )
+    pktgen.set("0", "count", count ) -- there is a limit on 4294949999 ==  32-bit unsigned integer, which is (2^32 - 1)
     Stats({duration=1,run = n})
     if size > 0 then pktgen.start(0) end
     local ret = Stats({ duration = duration/1000+5, run = n})
@@ -147,5 +147,5 @@ function Main(input)
   output:close()
 end
 
-I={d=20, r=100, t=1 , p = { 1024 }} -- TODO: jumbo frames is broken?!
+I={d=60, r=100, t=1 , p = { 64 }} -- TODO: jumbo frames is broken?!
 Main(... or I)
