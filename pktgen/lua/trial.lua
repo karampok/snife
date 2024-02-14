@@ -91,8 +91,6 @@ function RunTrial(speed, size, rate, duration,loss_tol, times)
 end
 
 function SetupTraffic()
-  pktgen.reset("all")
-
 
   pktgen.set("0", "count", 0)
   pktgen.set("0", "dport", 2222)
@@ -101,8 +99,8 @@ function SetupTraffic()
   pktgen.set("0", "sport", 400)
   pktgen.set_ipaddr("0", "dst", "16.2.2.2/24")
   pktgen.set_ipaddr("0", "src", "16.1.1.1")
-  pktgen.set_mac("0", "dst", "10:00:00:00:00:10")
-  pktgen.set_mac("0", "src", "10:00:00:00:00:12")
+  -- pktgen.set_mac("0", "dst", "10:00:00:00:00:10")
+  -- pktgen.set_mac("0", "src", "10:00:00:00:00:12")
   pktgen.set_proto("0", "udp")
 
   pktgen.set("1", "count", 10)
@@ -112,8 +110,8 @@ function SetupTraffic()
   pktgen.set("1", "sport", 500)
   pktgen.set_ipaddr("1", "dst", "16.1.1.1/24")
   pktgen.set_ipaddr("1", "src", "16.2.2.2")
-  pktgen.set_mac("1", "dst", "20:00:00:00:00:11")
-  pktgen.set_mac("1", "src", "20:00:00:00:00:13")
+  -- pktgen.set_mac("1", "dst", "20:00:00:00:00:11")
+  -- pktgen.set_mac("1", "src", "20:00:00:00:00:13")
 end
 
 function Main(input)
@@ -147,5 +145,5 @@ function Main(input)
   output:close()
 end
 
-I={d=60, r=100, t=1 , p = { 64 }} -- TODO: jumbo frames is broken?!
+I={d=120, r=30, t=4 , p = { 1512 }} -- TODO: jumbo frames is broken?!
 Main(... or I)

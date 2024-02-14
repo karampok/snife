@@ -1,10 +1,6 @@
 require "Pktgen"
 
--- pktgen:10:00:00:00:00:12 -> left tor.3 ->10:00:00:00:00:10:testpmd 
--- pktgen:20:00:00:00:00:13 <- right tor.121 <- 20:00:00:00:00:11:testpmd
---
 function SetupTraffic(n,d,r)
-  pktgen.reset("all")
   pktgen.set_proto("all", "udp")
 
   pktgen.set("0", "count", n)
@@ -12,10 +8,10 @@ function SetupTraffic(n,d,r)
   pktgen.set("0", "rate", r)
   pktgen.set("0", "size", d)
   pktgen.set("0", "sport", 400)
-  pktgen.set_ipaddr("0", "dst", "16.2.2.2/24"); -- set 0 dst ip 16.2.2.2
-  pktgen.set_ipaddr("0", "src", "16.1.1.1"); -- set 0 src ip 16.1.1.1/24
-  pktgen.set_mac("0", "src", "10:00:00:00:00:12")
-  pktgen.set_mac("0", "dst", "10:00:00:00:00:10")
+  pktgen.set_ipaddr("0", "dst", "16.2.2.2/24")
+  pktgen.set_ipaddr("0", "src", "16.1.1.1")
+  -- pktgen.set_mac("0", "src", "10:00:00:00:00:12")
+  -- pktgen.set_mac("0", "dst", "10:00:00:00:00:10")
 
 
   pktgen.set("1", "count", 10)
@@ -25,19 +21,19 @@ function SetupTraffic(n,d,r)
   pktgen.set("1", "sport", 500)
   pktgen.set_ipaddr("1", "dst", "16.1.1.1/24")
   pktgen.set_ipaddr("1", "src", "16.2.2.2")
-  pktgen.set_mac("1", "src", "20:00:00:00:00:13")
-  pktgen.set_mac("1", "dst", "20:00:00:00:00:11")
+  -- pktgen.set_mac("1", "src", "20:00:00:00:00:13")
+  -- pktgen.set_mac("1", "dst", "20:00:00:00:00:11")
 end
 
 
 function Main()
 
-  local pnumber = 1000000
+  local pnumber = 100000
   local psize = 1024
-  local rate =  20
+  local rate =  1
 
+--  pktgen.reset("all")
   SetupTraffic(pnumber, psize, rate)
-
   printf("# to transmit " .. pnumber .. " packets with packetSize " .. psize .. "B at rate " .. rate .. "%%\n" )
 
   pktgen.clr()
