@@ -145,5 +145,5 @@ function Main(input)
   output:close()
 end
 
-I={d=120, r=30, t=4 , p = { 1512 }} -- TODO: jumbo frames is broken?!
+I={d=60, r=100, t=1 , p = { 1024 }} -- TODO: jumbo frames is broken?!
 Main(... or I)
