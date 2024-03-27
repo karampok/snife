@@ -42,25 +42,23 @@ wg-quick up wg0
 
 echo "
 ###################################################
-cat <<EOF > /tmp/lab.conf
+echo \"
 [Interface]
 PrivateKey = $peer_privkey
 Address = 10.0.0.2/24
-PostUp =resolvectl dns %i 10.10.20.10; sudo resolvectl domain %i ~eric.vlab
+PostUp =resolvectl dns %i 10.10.20.10; sudo resolvectl domain %i ~telco.vlab; sudo resolvectl dnsovertls %i no
 
 [Peer]
 PublicKey = $server_pubkey
 AllowedIPs = 10.0.0.0/24, 10.10.10.0/24, 10.10.20.0/24, 192.168.100.0/24
 Endpoint = ${PUBLICIP:-x.y.z.k}:51820
 PersistentKeepalive = 25
-EOF
-
+\" > /tmp/lab.conf
 sudo wg-quick up /tmp/lab.conf
 
-mutagen sync create --name=hostname (pwd) root@10.0.0.1:/workspace
+mutagen sync create --name=$(hostname) (pwd) root@10.0.0.1:2022:/workspace
 mosh --ssh=\"ssh -p 2022\" root@10.0.0.1
 ###################################################
 " | tee /tmp/wgup
 
-
-add-wg-user.sh
+#add-wg-user.sh

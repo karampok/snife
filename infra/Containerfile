@@ -1,6 +1,6 @@
 FROM alpine:latest AS build
 
-ARG TSVERSION=1.48.2
+ARG TSVERSION=1.62.0
 
 WORKDIR /app
 RUN apk add --no-cache curl tar
@@ -8,14 +8,14 @@ RUN apk add --no-cache curl tar
 RUN curl -vsLo tailscale.tar.gz "https://pkgs.tailscale.com/stable/tailscale_${TSVERSION}_amd64.tgz" && \
   tar xzf tailscale.tar.gz --strip-components=1
 
-FROM fedora:38 as runtime
+FROM fedora:39 as runtime
 LABEL description="Run container"
 
-RUN echo -ne "[racadm]\nname=Racadm\nbaseurl=http://linux.dell.com/repo/hardware/dsu/os_dependent/RHEL8_64\nenabled=1\ngpgcheck=0" > /etc/yum.repos.d/racadm.repo
+#RUN echo -ne "[racadm]\nname=Racadm\nbaseurl=http://linux.dell.com/repo/hardware/dsu/os_dependent/RHEL8_64\nenabled=1\ngpgcheck=0" > /etc/yum.repos.d/racadm.repo
 
 RUN dnf install -y numactl strace ipcalc iptables file bind-utils tcpdump nmap-ncat iputils iproute \
       podman pip openssl coreos-installer dnf-plugin-config-manager tmux dhcp-client openssh-clients wget \
-      srvadmin-idracadm7 nmstate procps-ng hwloc-gui hwloc wireguard-tools inotify-tools hostname tini tree \
+      nmstate procps-ng hwloc-gui hwloc wireguard-tools inotify-tools hostname tini tree \
       openssh-server libvirt-devel tree mosh python3-jinja2-cli gcc python3-devel git mosh stress bridge-utils conntrack-tools \
       vim htop jq xz && dnf clean all
 
@@ -63,7 +63,7 @@ ENV TERM xterm
 
 
 #RUN printf 'python3 -m http.server 9000 -d /share\n' >> /etc/motd
-RUN printf 'mutagen sync create --name=hostname (pwd) root@hostname:/workspace -i bin\n' >> /etc/motd
+#RUN printf 'mutagen sync create --name=<hostname> (pwd) root@hostname:/workspace -i bin\n' >> /etc/motd
 
 USER root
 
