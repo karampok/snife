@@ -8,7 +8,7 @@ RUN apk add --no-cache curl tar
 RUN curl -vsLo tailscale.tar.gz "https://pkgs.tailscale.com/stable/tailscale_${TSVERSION}_amd64.tgz" && \
   tar xzf tailscale.tar.gz --strip-components=1
 
-FROM fedora:39 as runtime
+FROM fedora:40 as runtime
 LABEL description="Run container"
 
 #RUN echo -ne "[racadm]\nname=Racadm\nbaseurl=http://linux.dell.com/repo/hardware/dsu/os_dependent/RHEL8_64\nenabled=1\ngpgcheck=0" > /etc/yum.repos.d/racadm.repo
@@ -47,20 +47,18 @@ RUN cd /tmp \
   && chmod +x /usr/bin/gitlab-runner
 
 RUN cd /tmp \
-  && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.14/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && tar xvfz openshift-client-linux.tar.gz \
+  && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && tar xvfz openshift-client-linux.tar.gz \
   && mv oc kubectl /usr/bin/ && chmod +x /usr/bin/{oc,kubectl} && rm -f README.md openshift-client-linux.tar.gz
 
 RUN cd /tmp \
-  && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.14/openshift-install-linux.tar.gz -o openshift-install-linux.tar.gz && tar xvfz openshift-install-linux.tar.gz \
+  && curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest/openshift-install-linux.tar.gz -o openshift-install-linux.tar.gz && tar xvfz openshift-install-linux.tar.gz \
   && mv openshift-install /usr/bin/ && chmod +x /usr/bin/openshift-install && rm -f README.md openshift-install-linux.tar.gz
 
 COPY --from=build /app/tailscale /usr/bin/
 COPY --from=build /app/tailscaled /usr/bin/
 COPY bin/* /usr/bin/
-RUN mkdir -p /share /workspace /iso
-RUN pip3 install pandas matplotlib
+RUN mkdir -p /share /iso
 ENV TERM xterm
-
 
 #RUN printf 'python3 -m http.server 9000 -d /share\n' >> /etc/motd
 #RUN printf 'mutagen sync create --name=<hostname> (pwd) root@hostname:/workspace -i bin\n' >> /etc/motd
@@ -71,6 +69,7 @@ EXPOSE 51820/udp
 EXPOSE 2022/tcp
 EXPOSE 9000/tcp
 
+WORKDIR /workdir
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["start-ts.sh"]
 #CMD ["wg-quick", "up", "$WG_INTERFACE_NAME"]

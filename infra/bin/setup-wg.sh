@@ -31,7 +31,7 @@ Address = 10.0.0.1/24
 ListenPort = 51820
 MTU = 1280
 PrivateKey = ${server_privkey} #public (${server_pubkey})
-PreUp=iptables -t nat -I POSTROUTING 1 -s 10.0.0.0/24 -o access -j MASQUERADE
+PreUp=iptables -t nat -I POSTROUTING 1 -s 10.0.0.0/24 -o eth1 -j MASQUERADE
 
 [Peer]
 PublicKey = ${peer_pubkey} #private (${peer_privkey})
